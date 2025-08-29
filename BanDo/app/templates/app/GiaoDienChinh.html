@@ -1,0 +1,84 @@
+    {% load static %}
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Tìm đường đi trên bản đồ</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        
+        <!-- Font Awesome + Leaflet -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+        <link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet">
+
+        <!-- CSS custom -->
+        <link rel="stylesheet" href="{% static 'app/css/styles.css' %}">
+
+
+    </head>
+    <body>
+        <div class="bo-cuc-chinh">
+            <div id="map"></div>
+            <div class="hop-thong-tin">
+                <h1 class="tieu-de"><i class="fa-solid fa-location-dot"></i> Tìm đường đi trên bản đồ</h1>
+                
+                <form class="form-nhap" onsubmit="return false;">
+                    <label for="start">Điểm xuất phát:</label>
+                    <input type="text" id="start" placeholder="Nhập địa chỉ hoặc tọa độ" required>
+
+                    <label for="end">Điểm đến:</label>
+                    <input type="text" id="end" placeholder="Nhập địa chỉ hoặc tọa độ" required>
+
+                    <div class="button-row" style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button type="button" onclick="findRoute()">
+                        <i class="fa-solid fa-route"></i> Tìm
+                    </button>
+                    <button type="button" class="btn-secondary" onclick="resetMap()">
+                        <i class="fa-solid fa-eraser"></i> Xóa vị trí
+                    </button>
+                    <button type="button" class="btn-success" id="open-contact" >
+                        <i class="fa-solid fa-paper-plane"></i>Thông tin
+                    </button>
+                    </div>
+                </form>
+
+                <div id="route-info"></div>
+
+                <button type="button" onclick="getCurrentLocation()">
+                    <i class="fa-solid fa-location-crosshairs"></i> Lấy vị trí
+                </button>
+            </div>
+        </div>
+
+        <!-- Leaflet + JS custom -->
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script src="{% static 'app/js/xuli.js' %}"></script>
+
+        <!-- Overlay form liên hệ -->
+        <div id="contact-overlay-scrim" style="position:fixed;inset:0;display:none;z-index:10001;background:rgba(0,0,0,.35);"></div>
+        <div id="contact-overlay-card" style="display:none;position:fixed;z-index:10002;left:50%;top:50%;transform:translate(-50%,-50%);background:#0b1220;color:#e5e7eb;border:1px solid rgba(255,255,255,.08);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.45);width:min(420px,90vw);padding:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,.06);padding-bottom:8px;margin-bottom:12px;">
+            <div style="font-weight:600">Gửi thông tin cá nhân</div>
+            <button id="contact-close" class="btn-secondary" style="padding:6px 10px;border-radius:8px;cursor:pointer;">Đóng</button>
+        </div>
+        <form id="contact-form" class="form-nhap" onsubmit="return false;">
+            <label for="cf-name">Họ tên</label>
+            <input id="cf-name" type="text" placeholder="Nguyễn Văn A" required>
+
+            <label for="cf-email">Email</label>
+            <input id="cf-email" type="email" placeholder="email@example.com">
+
+            <label for="cf-phone">Số điện thoại</label>
+            <input id="cf-phone" type="tel" placeholder="0123 456 789">
+
+            <label for="cf-message">Nội dung</label>
+            <textarea id="cf-message" placeholder="Nhập nội dung..." required></textarea>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;">
+            <button type="button" id="contact-cancel" class="btn-secondary">Hủy</button>
+            <button type="submit" class="btn-success"><i class="fa-solid fa-paper-plane"></i> Gửi</button>
+            </div>
+        </form>
+        </div>
+    </body>
+    </html>

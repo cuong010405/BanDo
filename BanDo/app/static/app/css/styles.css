@@ -1,622 +1,414 @@
-                /* ============================================================
-                styles.css - Giao diện bản đồ (Leaflet) + khung thao tác
-                Ghi chú (tiếng Việt):
-                - Bố cục: khung thao tác bên trái, bản đồ bên phải (desktop).
-                - Làm đẹp nút, input, marker, tooltip, popup, overlay thông tin.
-                - Tối ưu responsive cho màn hình nhỏ (xếp dọc panel trên, bản đồ dưới).
-                - Có chú thích rõ ràng để dễ chỉnh sửa về sau.
-                ============================================================ */
+/* ========== Reset & Biến màu ========== */
+* { box-sizing: border-box; }
+:root {
+  --bg: #0f172a;
+  --border: rgba(255,255,255,.08);
+  --card-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
 
-                /* ========== Reset & Biến màu dùng chung ========== */
-                * { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: #e5e7eb; font-family: sans-serif; }
 
-                :root {
-                --bg: #0f172a;              /* Nền tổng thể (slate-900) */
-                --bg-soft: #111827;         /* Nền tối mềm hơn (gray-900) */
-                --panel: #0b1220;           /* Nền thẻ (card) đậm */
-                --text: #e5e7eb;            /* Màu chữ chính (gray-200) */
-                --muted: #9ca3af;           /* Màu chữ mờ (gray-400) */
-                --primary: #3b82f6;         /* Xanh dương chính (blue-500) */
-                --primary-600: #2563eb;     /* Xanh dương đậm */
-                --primary-700: #1d4ed8;     /* Xanh dương đậm hơn */
-                --accent: #22d3ee;          /* Xanh ngọc nổi bật (cyan-400) */
-                --success: #10b981;         /* Xanh lá thành công */
-                --danger: #ef4444;          /* Đỏ cảnh báo */
-                --warning: #f59e0b;         /* Vàng cảnh báo */
-                --ring: rgba(59, 130, 246, .35); /* Vòng sáng khi focus */
-                --card-shadow: 0 10px 30px rgba(0, 0, 0, .35);
-                --soft-shadow: 0 6px 18px rgba(0, 0, 0, .25);
-                --border: rgba(255, 255, 255, .06);
-                }
+/* Layout: Sidebar trái + Map phải */
+.bo-cuc-chinh {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  grid-template-rows: 100vh;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
 
-                /* ========== Cơ bản ========== */
-                html, body { height: 100%; }
-                body {
-                margin: 0;
-                background:
-                    radial-gradient(1200px 600px at 10% -10%, rgba(56,189,248,.08), transparent),
-                    radial-gradient(900px 500px at 110% 10%, rgba(59,130,246,.08), transparent),
-                    var(--bg);
-                color: var(--text);
-                font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-                -webkit-font-smoothing: antialiased;
-                -moz-osx-font-smoothing: grayscale;
-                }
+/* menu */
+.sidebar {
+  width: 68px;
+  background: #f5f7fa;
+  color: #222;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  border: none;
+  box-shadow: none;
+  min-height: 100vh;
+}
+.sidebar .sidebar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 0 10px 0;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  transition: background .15s;
+}
+.sidebar .sidebar-item:hover { background: #e8eef3; }
+.sidebar .sidebar-icon { font-size: 1.5rem; }
+.sidebar .sidebar-label {
+  font-size: 0.92rem;
+  color: #222;
+  text-align: center;
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar .sidebar-divider {
+  width: 80%;
+  height: 1px;
+  background: #e0e6ed;
+  margin: 10px auto;
+  border: none;
+}
 
-                /* ========== Bố cục chính: Panel trái - Bản đồ phải ========== */
-                .bo-cuc-chinh {
-                display: flex;
-                flex-direction: row;       /* Panel trái, map phải (mặc định) */
-                align-items: stretch;
-                flex-wrap: nowrap;
-                gap: 18px;
-                height: 100vh;
-                width: 100vw;
-                padding: 18px;
-                }
+/* Overlay form popup */
+.overlay-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
 
-                /* Khung thao tác (bên trái) */
-                .hop-thong-tin {
-                order: 1;
-                flex: 0 0 420px;           /* Rộng cố định ~420px */
-                max-width: 520px;
-                min-width: 320px;
-                background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
-                border: 1px solid var(--border);
-                backdrop-filter: blur(6px);
-                border-radius: 16px;
-                padding: 22px 20px;
-                display: flex;
-                flex-direction: column;
-                gap: 16px;
-                box-shadow: var(--card-shadow);
-                }
+/* Card form */
+.hop-thong-tin {
+  background: #0b1220;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--card-shadow);
+  width: min(420px, 92vw);
+}
+.tieu-de {
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-align: center;
+}
 
-                /* Bản đồ (bên phải) */
-                #map {
-                order: 2;
-                flex: 1 1 auto;
-                min-width: 0;
-                width: 100%;
-                height: 100%;
-                border-radius: 16px;
-                overflow: hidden;
-                box-shadow: var(--card-shadow);
-                }
+.form-nhap label { display:block; margin-top:10px; }
+.form-nhap input { width:100%; padding:10px; border-radius:8px; border:1px solid #333; background:#111; color:#fff; }
+.button-row { display:flex; gap:10px; margin-top:12px; }
+.button-row button { flex:1; padding:10px; border:none; border-radius:8px; cursor:pointer; font-weight:600; }
 
-                /* ========== Tiêu đề panel ========== */
-                .tieu-de {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-                margin: 0 0 8px 0;
-                font-size: 1.2rem;
-                font-weight: 700;
-                letter-spacing: .3px;
-                width: 100%;
-                text-align: center;
-                }
-                .tieu-de i {
-                color: var(--accent);
-                text-shadow: 0 2px 10px rgba(34, 211, 238, .25);
-                }
-
-                /* ========== Form nhập liệu ========== */
-                .form-nhap .nhom {           /* Nhóm form (nếu dùng) */
-                display: flex;
-                flex-direction: column;
-                gap: 6px;
-                }
-
-                .form-nhap label {
-                display: block;
-                font-size: .9rem;
-                color: var(--muted);
-                margin: 10px 0 6px;
-                }
-
-                .form-nhap input,
-                .form-nhap select,
-                .form-nhap textarea {
-                width: 100%;
-                padding: 12px 12px;
-                border-radius: 12px;
-                border: 1px solid var(--border);
-                background: rgba(255,255,255,.03);
-                color: var(--text);
-                outline: none;
-                transition: border-color .2s ease, box-shadow .2s ease, background .2s ease, transform .06s ease;
-                }
-                .form-nhap textarea {
-                resize: vertical;
-                min-height: 90px;
-                }
-                .form-nhap input::placeholder,
-                .form-nhap textarea::placeholder { color: #9aa3b2; }
-
-                .form-nhap input:focus,
-                .form-nhap select:focus,
-                .form-nhap textarea:focus {
-                border-color: var(--primary);
-                box-shadow: 0 0 0 4px var(--ring);
-                background: rgba(255,255,255,.05);
-                }
-
-                /* Trạng thái lỗi (nếu cần) */
-                .form-nhap .invalid,
-                .form-nhap input.invalid,
-                .form-nhap select.invalid,
-                .form-nhap textarea.invalid {
-                border-color: rgba(239, 68, 68, .7);
-                box-shadow: 0 0 0 4px rgba(239, 68, 68, .12);
-                }
-
-                /* Input kèm nút bên phải (append) */
-                .input-append {
-                display: flex;
-                align-items: stretch;
-                gap: 8px;
-                }
-                .input-append input { flex: 1 1 auto; }
-                .input-append .btn {
-                white-space: nowrap;
-                }
-
-                /* ========== Nút bấm ========== */
-                .form-nhap button,
-                .hop-thong-tin > button,
-                .btn {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                gap: 10px;
-                background: linear-gradient(180deg, var(--primary), var(--primary-600));
-                color: #fff;
-                border: none;
-                padding: 12px 16px;
-                border-radius: 12px;
-                cursor: pointer;
-                font-size: .98rem;
-                font-weight: 600;
-                margin-top: 10px;
-                margin-bottom: -5px;
-                transition: transform .08s ease, filter .2s ease, box-shadow .2s ease;
-                box-shadow: 0 8px 22px rgba(37, 99, 235, .35);
-                }
-                .form-nhap button:hover,
-                .hop-thong-tin > button:hover,
-                .btn:hover {
-                filter: brightness(1.05);
-                box-shadow: 0 10px 26px rgba(37, 99, 235, .45);
-                }
-                .form-nhap button:active,
-                .hop-thong-tin > button:active,
-                .btn:active { transform: translateY(1px); }
-
-                /* Biến th�� nút phụ */
-                .btn-secondary {
-                background: linear-gradient(180deg, #334155, #1f2937);
-                box-shadow: var(--soft-shadow);
-                }
-                .btn-success {
-                background: linear-gradient(180deg, #10b981, #059669);
-                box-shadow: 0 8px 22px rgba(16,185,129,.35);
-                }
-                .btn-danger {
-                background: linear-gradient(180deg, #ef4444, #dc2626);
-                box-shadow: 0 8px 22px rgba(239,68,68,.35);
-                }
-
-                /* Icon trong nút */
-                button i, .btn i {
-                font-size: 1.05rem;
-                opacity: .95;
-                filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
-                }
-
-                /* ========== Thẻ thông tin lộ trình ========== */
-                #route-info {
-                margin-top: 10px;
-                border-radius: 12px;
-                border: 1px solid var(--border);
-                background: rgba(255,255,255,.03);
-                padding: 14px 12px;
-                color: var(--text);
-                line-height: 1.65;
-                box-shadow: var(--soft-shadow);
-                }
-                #route-info b { color: #eaecef; }
-
-                /* ========== Tinh chỉnh Leaflet ========== */
-                /* Nút zoom */
-                .leaflet-control-zoom a {
-                background: rgba(18, 24, 38, .85);
-                color: #e5e7eb;
-                border: 1px solid var(--border);
-                transition: filter .2s ease, background .2s ease;
-                }
-                .leaflet-control-zoom a:hover {
-                background: rgba(30, 41, 59, .95);
-                filter: brightness(1.08);
-                }
-
-                /* Attribution */
-                .leaflet-control-attribution {
-                background: rgba(11,18,32,.6);
-                color: var(--muted);
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                padding: 2px 6px;
-                margin: 0 6px 6px 0;
-                }
-
-                /* Popup */
-                .leaflet-popup-content-wrapper,
-                .leaflet-popup-tip {
-                background: #0b1220;
-                color: var(--text);
-                border: 1px solid var(--border);
-                box-shadow: var(--soft-shadow);
-                }
-
-                /* Tooltip (dùng cho POIs) */
-                .leaflet-tooltip {
-                background: rgba(11,18,32,.92);
-                color: #e5e7eb;
-                border: 1px solid var(--border);
-                border-radius: 8px;
-                box-shadow: var(--soft-shadow);
-                }
+/* Nút chính (Gửi) */
+.button-row button:first-child {
+  background: linear-gradient(180deg, #3b82f6, #2563eb);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(59,130,246,.4);
+}
+.btn-secondary { background:#444; color:#fff; }
+.btn-danger { background:#b91c1c; color:#fff; }
 
 
 
+/* Ngăn nút bị scale khi active/click; chỉ đổi màu */
+#loc-btn, #loc-btn * {
+  transform: none !important;
+  transition: none !important;
+}
+#loc-btn:active { background: #e8eef3 !important; }
+
+/* blink animation */
+@keyframes icon-blink {
+  0%   { filter: brightness(1); }
+  50%  { filter: brightness(2) drop-shadow(0 0 8px #0202f0); }
+  100% { filter: brightness(1); }
+}
+/* Áp dụng cho cả <i> hoặc .sidebar-icon */
+#loc-btn .sidebar-icon.blinking,
+#loc-btn i.blinking {
+  animation: icon-blink 0.7s linear infinite;
+}
+
+/* ====== FORM LIÊN HỆ ====== */
+#contact-overlay-scrim,
+#contact-overlay-card {
+  display: none; /* Ẩn form khi load trang */
+}
+
+#contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Label */
+#contact-form label {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+/* Input, textarea */
+#contact-form input,
+#contact-form textarea {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
+  outline: none;
+  transition: border-color .2s, box-shadow .2s, background .2s;
+}
+#contact-form textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+/* Placeholder */
+#contact-form input::placeholder,
+#contact-form textarea::placeholder {
+  color: #9aa3b2;
+}
+
+/* Focus effect */
+#contact-form input:focus,
+#contact-form textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--ring);
+  background: rgba(255,255,255,.06);
+}
+
+/* Action buttons */
+#contact-form .form-actions,
+#contact-form > div[style] {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* Nút Hủy */
+#contact-form .btn-secondary {
+  background: linear-gradient(180deg, #334155, #1f2937);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: filter .2s, box-shadow .2s;
+}
+#contact-form .btn-secondary:hover {
+  filter: brightness(1.1);
+  box-shadow: var(--soft-shadow);
+}
+
+/* Nút Gửi */
+#contact-form .btn-success {
+  background: linear-gradient(180deg, #10b981, #059669);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 6px 18px rgba(16,185,129,.35);
+  transition: filter .2s, transform .1s;
+}
+#contact-form .btn-success:hover {
+  filter: brightness(1.08);
+}
+#contact-form .btn-success:active {
+  transform: translateY(1px);
+}
 
 
-                /* Card: mặc định hiển thị ở giữa (gọn hơn) */
-                #place-overlay-card {
-                position: fixed !important;
-                left: 50% !important;
-                top: 50% !important;
-                right: auto !important;
-                transform: translate(-50%, -50%) !important;
-                width: min(380px, 92vw) !important;   /* rộng hơn 1 chút so với trước */
-                max-height: 78vh !important;
-                z-index: 9999 !important;
-                background: #0b1220 !important;
-                color: var(--text) !important;
-                border: 1px solid var(--border) !important;
-                border-radius: 12px !important;
-                box-shadow: var(--card-shadow) !important;
-                overflow: auto !important;
-                }
+/* đưa ra giữa màn hình */
+#contact-overlay-card {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1e1e2f;            /* nền tối dễ nhìn */
+  border: 1px solid #333;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.55);
+  padding: 22px 20px;
+  width: min(420px, 90%);
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 1001;
+  color: #f1f1f1;                 /* chữ sáng */
+}
 
-                /* (Tùy chọn) Nếu muốn overlay nằm sát trái (gần panel): thêm class .overlay-left vào body */
-                body.overlay-left #place-overlay-card {
-                left: 24px !important;
-                right: auto !important;
-                transform: translate(0, 0) !important;
-                top: 24px !important;
-                }
+/* Label */
+#contact-form label {
+  display: block;
+  margin-top: 10px;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #e2e8f0;                  /* màu chữ nhạt sáng */
+}
 
-                /* ========== Cuộn (scrollbar) đẹp hơn ========== */
-                .hop-thong-tin,
-                #place-overlay-card {
-                scrollbar-width: thin;
-                scrollbar-color: rgba(148,163,184,.6) transparent;
-                }
-                .hop-thong-tin::-webkit-scrollbar,
-                #place-overlay-card::-webkit-scrollbar { width: 10px; height: 10px; }
-                .hop-thong-tin::-webkit-scrollbar-thumb,
-                #place-overlay-card::-webkit-scrollbar-thumb {
-                background: linear-gradient(180deg, rgba(148,163,184,.6), rgba(148,163,184,.4));
-                border-radius: 8px;
-                border: 2px solid transparent;
-                background-clip: content-box;
-                }
-                .hop-thong-tin::-webkit-scrollbar-track,
-                #place-overlay-card::-webkit-scrollbar-track {
-                background: transparent;
-                }
+/* Input + textarea */
+#contact-form input,
+#contact-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #444;
+  background: #2a2a3d;
+  color: #fff;
+  font-size: 0.95rem;
+}
 
-                /* ========== Lưới chia cột nhỏ trong panel (nếu cần) ========== */
-                .split-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
-                }
+#contact-form input::placeholder,
+#contact-form textarea::placeholder {
+  color: #999;
+}
 
-                /* ========== Responsive ========== */
-                @media (max-width: 1200px) {
-                .hop-thong-tin { flex-basis: 380px; }
-                }
+/* Nút */
+.btn-secondary {
+  background: #374151;
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
 
-                @media (max-width: 1024px) {
-                /* Gợi ý tỷ lệ (vẫn là flex) */
-                .bo-cuc-chinh { gap: 14px; padding: 14px; }
-                .hop-thong-tin { flex-basis: 360px; }
-                }
+.btn-secondary:hover {
+  background: #4b5563;
+}
 
-                @media (max-width: 820px) {
-                /* Màn nhỏ: xếp dọc cho dễ thao tác */
-                .bo-cuc-chinh {
-                    flex-direction: column;
-                    height: auto;
-                }
-                .hop-thong-tin {
-                    order: 1;
-                    position: relative;
-                    top: 0;
-                    width: 100%;
-                }
-                #map {
-                    order: 2;
-                    height: 60vh; /* Bản đồ không chiếm quá nhiều chiều cao */
-                }
-                /* Overlay ở giữa vẫn ổn trên màn nhỏ */
-                }
-                @media (max-width: 600px) {
-                    /* Màn nhỏ hơn nữa */
-                    .bo-cuc-chinh { padding: 12px; }
-                    
-                    .hop-thong-tin { flex-basis: 100%; }
-                    #map { height: 50vh; }
-                    #place-overlay-card { width: 90vw; }
-                }
-                /* POI icon (Leaflet sẽ gán .leaflet-marker-icon + class name ta cung cấp) */
-                .leaflet-marker-icon.poi-icon {
-                    filter: drop-shadow(0 8px 18px rgba(0,0,0,.35));
-                    transition: transform .12s ease, filter .2s ease, opacity .2s ease;
-                    will-change: transform, filter;          /* Tối ưu hiệu năng */
-                                    /* Cô lập layou t để tránh bị kéo dãn ngoài ý muốn */
-                }
-                .leaflet-marker-icon.poi-icon:hover {
-                    transform: translateY(-1px) scale(1.02);
-                    filter: drop-shadow(0 12px 22px rgba(0,0,0,.5));
-                }
+.btn-success {
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(34,197,94,.35);
+}
 
-                /* Bố cục icon + nhãn */
-                .leaflet-marker-icon.poi-icon .poi {
-                    display: flex;
-                    align-items: center;
-                    gap: 8px;
-                    flex: 0 0 auto;
-                }
+.btn-success:hover {
+  filter: brightness(1.1);
+}
+/* địa điểm trong khuôn viên */
 
-                /* Chấm tròn POI */
-                .leaflet-marker-icon.poi-icon .poi-dot {
-                    width: 14px;
-                    height: 14px;
-                    border-radius: 50%;
-                    background: #22d3ee; /* cyan-400 */
-                    border: 2px solid rgba(255,255,255,.9);
-                    box-shadow: 0 6px 14px rgba(0,0,0,.35);
-                    flex: 0 0 auto;
-                }
+.poi-label {
+  position: relative; /* hoặc static nếu không cần chỉnh vị trí */
+  background: #fff;
+  color: #222;
+  padding: 4px 10px;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: pre-line;
+  text-align: center;
+  margin-left: 6px; /* đẩy label sang phải marker */
+  margin-top: 0;
+  transition: none;
+  filter: none;
+  opacity: 1;
+  pointer-events: auto;
+}
 
-                /* Nhãn tên POI */
-                .leaflet-marker-icon.poi-icon .poi-label {
-                    background: rgba(11,18,32,.9);
-                    color: #e5e7eb;
-                    border: 1px solid rgba(255,255,255,.08);
-                    padding: 2px 6px;
-                    border-radius: 6px;
-                    font-size: 12px;
-                    line-height: 1.2;
-                    backdrop-filter: saturate(140%) blur(4px);
-                    white-space: nowrap;
-                    user-select: none;
-                }
+/* Không hiệu ứng hover dịch chuyển */
+.poi-label:hover {
+  background: #2563eb;
+  color: #fff;
+  transform: none;
+}
+/* Container icon */
+.poi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: sans-serif;
+  font-size: 13px;
+  color: #111;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(255,255,255,.8);
+  pointer-events: none; /* không chắn click map */
+}
 
-                /* Tooltip đồng bộ (tùy chọn) */
-                .leaflet-tooltip {
-                    background: rgba(11,18,32,.92);
-                    color: #e5e7eb;
-                    border: 1px solid rgba(255,255,255,.08);
-                    border-radius: 8px;
-                    box-shadow: 0 6px 18px rgba(0,0,0,.25);
-                }
+/* Chấm tròn (dot marker) */
+.poi-dot {
+  width: 10px;
+  height: 10px;
+  background: #2563eb;       /* xanh dương */
+  border-radius: 50%;
+  border: 2px solid #fff;    /* viền trắng nhìn rõ hơn */
+  box-shadow: 0 0 4px rgba(0,0,0,.3);
+  flex-shrink: 0;
+}
 
-                /* ================= Overlays & Loaders moved from JS ================= */
-                /* Generic scrim to center content */
-                .overlay-scrim {
-                position: fixed;
-                inset: 0;
-                z-index: 10000;
-                background: rgba(0,0,0,.35);
-                display: none; /* JS sẽ bật tắt display */
-                align-items: center;
-                justify-content: center;
-                }
+/* Label chữ */
+.poi-label {
+  position: relative;
+  background: #fff;
+  color: #222;
+  padding: 8px 18px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.13);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;      /* luôn 1 dòng ngang, tự giãn theo chữ */
+  text-align: center;
+  margin-left: 10px;
+  margin-top: 0;
+  transition: none;
+  filter: none;
+  opacity: 1;
+  pointer-events: auto;
+}
 
-                /* Loader box and spinner */
-                .loader-box {
-                background: var(--panel);
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                padding: 16px 18px;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                box-shadow: var(--card-shadow);
-                }
-                .spinner {
-                width: 28px; height: 28px; border-radius: 50%;
-                border: 3px solid rgba(255,255,255,.2);
-                border-top-color: var(--accent);
-                animation: glspin .9s linear infinite;
-                }
-                .loader-text { color: var(--text); font-weight: 600; }
+/*mũi tên chỉ xuống dưới*/
+/* Container của icon người dùng */
+.user-heading-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3); /* nền mờ để dễ nhìn */
+  backdrop-filter: blur(4px);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.6); /* viền sáng xanh */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* không chắn click map */
+}
 
-                @keyframes glspin { to { transform: rotate(360deg); } }
+/* Thêm hiệu ứng khi icon xuất hiện */
+.user-heading-icon svg {
+  transition: transform 0.25s ease-in-out;
+}
 
-                /* Center notice */
-                .center-notice {
-                position: fixed;
-                left: 50%; top: 50%;
-                transform: translate(-50%, -50%);
-                z-index: 10004;
-                display: none; /* JS sẽ bật/tắt */
-                }
-                .center-notice-box {
-                min-width: 260px; max-width: 80vw;
-                background: var(--panel);
-                color: var(--text);
-                border: 1px solid var(--border);
-                border-radius: 12px;
-                box-shadow: var(--card-shadow);
-                padding: 14px 16px;
-                text-align: center;
-                font-weight: 600;
-                }
+/* Nhấn mạnh chấm vị trí */
+.user-heading-icon circle {
+  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.8));
+}
 
-                /* Place overlay content blocks */
-                .place-card-header {
-                position: sticky; top: 0;
-                background: var(--panel);
-                border-bottom: 1px solid var(--border);
-                padding: 12px 14px;
-                border-radius: 12px 12px 0 0;
-                display: flex; align-items: center; justify-content: space-between; gap: 8px;
-                }
-                .place-card-title {
-                font-weight: 600; color: var(--text);
-                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70%;
-                }
-                .place-card-content { padding: 14px 14px 8px 14px; line-height: 1.65; }
-                .place-card-address { color: #cbd5e1; }
-                .place-card-description { color: var(--text); margin-top: 6px; }
-                .place-card-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+/* Nhấn mạnh mũi tên hướng */
+.user-heading-icon path {
+  filter: drop-shadow(0 0 3px rgba(34, 211, 238, 0.7));
+}
 
-                /* Contact overlay (for completeness; inline styles in template may override) */
-                #contact-overlay-scrim {
-                position: fixed; inset: 0; display: none; z-index: 10001; background: rgba(0,0,0,.35);
-                }
-                #contact-overlay-card {
-                display: none; position: fixed; z-index: 10002; left: 50%; top: 50%; transform: translate(-50%, -50%);
-                background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--card-shadow);
-                width: min(420px, 90vw); padding: 16px;
-                }
 
-                /* ================= Mobile compact & button row ================= */
-                @media (max-width: 600px) {
-                .button-row { display: flex; gap: 8px !important; flex-wrap: nowrap !important; }
-                .button-row button { flex: 1 1 0; min-width: 0; padding: 10px 8px; font-size: .9rem; }
-                }
-                @media (max-width: 430px) {
-                .button-row { display: flex; gap: 8px !important; flex-wrap: nowrap !important; }
-                .button-row button { flex: 1 1 0; min-width: 0; padding: 9px 8px; font-size: .88rem; }
-                }
-                @media (max-width: 380px) {
-                .button-row { display: flex; gap: 6px !important; flex-wrap: nowrap !important; }
-                .button-row button { flex: 1 1 0; min-width: 0; padding: 8px 6px; font-size: .85rem; }
-                }
-                :root {
-      --sidebar-expanded-width: 360px;
-      --sidebar-collapsed-width: 56px;
-      --sidebar-bg: #0b1220; /* giữ cùng tone với overlay */
-      --sidebar-border: rgba(255,255,255,.08);
-      --transition: 240ms ease;
-    }
 
-    /* Bố cục chính: 2 cột (sidebar + map) */
-    .bo-cuc-chinh {
-      display: grid;
-      grid-template-columns: var(--sidebar-expanded-width) 1fr;
-      grid-template-rows: 100vh; /* toàn màn hình */
-      width: 100%;
-      height: 100vh;
-      overflow: hidden;
-    }
 
-    /* Trạng thái thu gọn: sidebar hẹp */
-    .bo-cuc-chinh.sidebar-collapsed {
-      grid-template-columns: var(--sidebar-collapsed-width) 1fr;
-    }
 
-    /* Sidebar trái */
-    .sidebar {
-      display: flex;
-      flex-direction: column;
-      background: var(--sidebar-bg);
-      color: #e5e7eb;
-      border-right: 1px solid var(--sidebar-border);
-      transition: width var(--transition), transform var(--transition);
-      overflow: hidden;
-    }
 
-    /* Vùng logo/toggle luôn hiển thị */
-    .sidebar-header {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 56px;
-      border-bottom: 1px solid var(--sidebar-border);
-      cursor: pointer;
-      user-select: none;
-    }
-    .sidebar-header:focus {
-      outline: 2px solid #60a5fa;
-      outline-offset: -2px;
-    }
-
-    .sidebar-logo {
-      width: 32px;
-      height: 32px;
-      object-fit: contain;
-      display: block;
-      filter: drop-shadow(0 1px 2px rgba(0,0,0,.35));
-    }
-
-    /* Nội dung sidebar (ẩn khi thu gọn) */
-    .sidebar-content {
-      padding: 12px;
-      overflow: auto;
-      height: calc(100% - 56px);
-      transition: opacity var(--transition);
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .bo-cuc-chinh.sidebar-collapsed .sidebar-content {
-      opacity: 0;
-      pointer-events: none;
-      height: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-
-    /* Map full height */
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-
-    /* Responsive: màn nhỏ, sidebar chồng lên map khi mở để tối ưu diện tích */
-    @media (max-width: 768px) {
-      .bo-cuc-chinh {
-        position: relative;
-        display: block; /* fallback cho mobile */
-      }
-      #sidebar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        height: 100vh;
-        width: var(--sidebar-expanded-width);
-        transform: translateX(0);
-        z-index: 1000;
-        transition: transform var(--transition);
-      }
-      .bo-cuc-chinh.sidebar-collapsed #sidebar {
-        width: var(--sidebar-collapsed-width);
-      }
-      /* Khi thu gọn, chỉ để lại dải logo nhỏ */
-      .bo-cuc-chinh.sidebar-collapsed #sidebar {
-        transform: translateX(0);
-      }
-      /* Để map luôn 100% phía dưới */
-      #map {
-        position: absolute;
-        inset: 0;
-      }
-    }

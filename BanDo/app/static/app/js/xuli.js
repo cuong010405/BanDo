@@ -50,27 +50,21 @@ document.addEventListener('DOMContentLoaded', function () {
   function initMap() {
     map = L.map(mapEl, {
       center: [10.762622, 106.660172],
-      zoom: 5,
-      minZoom: 2,
+      zoom: 19,
+      minZoom: 18,
       maxZoom: 19
     });
 
     // Lớp nền OSM
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    L.tileLayer('https://cartodb-basemaps-a.global.ssl.fastly.net/light_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; OpenStreetMap contributors &copy; Carto',
+  subdomains: 'abcd',
+  maxZoom: 20
+}).addTo(map);
+
 
     // Vẽ polygon khuôn viên (ví dụ)
-    const campusCoords = [
-      [10.418770, 105.644008],
-      [10.422369, 105.640698],
-      [10.422487, 105.640934],
-      [10.421848, 105.644982],
-      [10.418997, 105.645239],
-      [10.418680, 105.645049]
-    ];
-    campusPolygon = L.polygon(campusCoords, { color: '#22d3ee', weight: 2, fillOpacity: 0.05 }).addTo(map);
+    
 
     initCampusPOIs();
     centerToCampus();
@@ -159,8 +153,7 @@ function attachEventHandlers() {
   window.startTrackingBlink = startTrackingBlink;
   window.stopTrackingBlink = stopTrackingBlink;
 // ...existing code...
- 
- 
+
 
   }
 
@@ -739,16 +732,71 @@ function attachEventHandlers() {
     }
 
     const campusPOIs = [
-      { id: 'gate',    name: 'Cổng chính',    lat: 10.420480, lng: 105.642150, description: 'Cổng vào chính của khuôn viên trường.' },
-      { id: 'hall-a',  name: 'Giảng đường A', lat: 10.420950, lng: 105.642800, description: 'Giảng đường lớn dành cho các lớp học tập trung.' },
-      { id: 'library', name: 'Thư viện',      lat: 10.420200, lng: 105.641650, description: 'Thư viện trường, mở cửa từ 7:30 - 20:00.' },
-      { id: 'dorm',    name: 'Ký túc xá',     lat: 10.419720, lng: 105.643700, description: 'Ký túc xá sinh viên.' },
-      { id: 'parking', name: 'Nhà xe',        lat: 10.421250, lng: 105.643900, description: 'Khu vực gửi xe cho sinh viên và cán bộ.' }
-    ];
+      { id: 'gateC',    name: 'Cổng C',    lat: 10.421031, lng: 105.641932, description: 'Cổng C của khuôn viên trường.' },
+      { id: 'gateB',    name: 'Cổng B',    lat: 10.420366, lng: 105.642533, description: 'Cổng B của khuôn viên trường.' },
 
+      { id: 'buildingB1',    name: 'Tòa B1',    lat: 10.420717, lng: 105.642506, description: 'Tòa B1' },
+      { id: 'buildingB2',    name: 'Tòa B2',    lat: 10.420904, lng: 105.642823, description: 'Tòa B2' },
+      { id: 'buildingB3',    name: 'Tòa B3',    lat: 10.421105, lng: 105.643024, description: 'Tòa B3' },
+      { id: 'buildingB4',    name: 'Tòa B4',    lat: 10.421303, lng: 105.643228, description: 'Tòa B4' },
+      { id: 'buildingB5',    name: 'Tòa B5',    lat: 10.421485, lng: 105.643474, description: 'Tòa B5' },
+
+      { id: 'buildingC1',    name: 'Tòa C1',    lat: 10.421712, lng: 105.641854, description: 'Tòa C1' },
+      { id: 'buildingC2',    name: 'Tòa C2',    lat: 10.422120, lng: 105.641495, description: 'Tòa C2' },
+
+      { id: 'buildingA1',    name: 'Tòa A1',    lat: 10.420419, lng: 105.643402, description: 'Tòa A1' },
+      { id: 'buildingA4',    name: 'Tòa A4',    lat: 10.420327, lng: 105.643968, description: 'Tòa A4' },
+      { id: 'buildingA7',    name: 'Tòa A7',    lat: 10.419032, lng: 105.643874, description: 'Tòa A7' },
+      { id: 'buildingA8',    name: 'Tòa A8',    lat: 10.419274, lng: 105.644832, description: 'Tòa A8' },
+      { id: 'buildingA9',    name: 'Tòa A9',    lat: 10.418984, lng: 105.644384, description: 'Tòa A9' },
+
+      { id: 'buildingT1',    name: 'Tòa T1',    lat: 10.419760, lng: 105.644797, description: 'Tòa T1' },
+      { id: 'buildingT3',    name: 'Tòa T3',    lat: 10.419385, lng: 105.645060, description: 'Tòa T3' },
+
+
+      { id: 'buildingH1',          name: 'Tòa H1',                 lat: 10.420601, lng: 105.643611, description: 'Tòa H1' },
+      { id: 'buildingH2',          name: 'Tòa H2',                 lat: 10.419686, lng: 105.644293, description: 'Tòa H2' },
+      { id: 'buildingH3',          name: 'Tòa H3',                 lat: 10.420142, lng: 105.644641, description: 'Tòa H3' },
+
+      { id: 'sports hall',         name: 'Nhà thi đấu đa năng',    lat: 10.421258, lng: 105.642284, description: 'Nhà thi đấu đa năng' },
+      { id: 'pickleball court',    name: 'Sân pickleball',         lat: 10.421511, lng: 105.642616, description: 'Sân pickleball' },
+      { id: 'basketball court',    name: 'Sân basketball',         lat: 10.421696, lng: 105.642917, description: 'Sân basketball' },
+      { id: 'soccer field',        name: 'Sân soccer',             lat: 10.420825, lng: 105.644397, description: 'Sân soccer' },
+      { id: 'experimental area',   name: 'Khu thí nghiệm',         lat: 10.420781, lng: 105.644899, description: 'Khu thí nghiệm' },
+
+      { id: 'hall-a',   name: 'Giảng đường A',  lat: 10.419691, lng: 105.643799, description: 'Giảng đường lớn dành cho các lớp học tập trung.' },
+      { id: 'library',  name: 'Thư viện',       lat: 10.421060, lng: 105.643770, description: 'Thư viện trường, mở cửa từ 7:30 - 20:00.' },
+      { id: 'dorm',     name: 'Ký túc xá',      lat: 10.421669, lng: 105.643866, description: 'Ký túc xá sinh viên.' },
+      { id:'hieubo',    name: 'Hiệu bộ',        lat: 10.420409, lng: 105.642938, description: 'Hiệu bộ trường Đại học Đồng Tháp.' },
+
+      { id: 'parkingB', name: 'Nhà xe cổng B',  lat: 10.421197, lng: 105.643890, description: 'Khu vực gửi xe cho sinh viên và cán bộ.' },
+      { id: 'parkingC', name: 'Nhà xe cổng C',  lat: 10.421073, lng: 105.642450, description: 'Khu vực gửi xe cho sinh viên và cán bộ.' },
+
+      { id: 'school',   name: 'Trường mẫu giáo',lat: 10.418921, lng: 105.644955, description: 'Trường mẫu giáo dành cho con em cán bộ và sinh viên.' },
+      { id: 'pool',     name: 'Hồ bơi',         lat: 10.422321, lng: 105.640886, description: 'Hồ bơi' }
+      
+    ];
+     // Tập hợp các tọa độ [lat, lng]
+const path = [
+  [10.420825, 105.644397], // Ví dụ: Sân soccer
+  [10.420781, 105.644899], // Ví dụ: Khu thí nghiệm
+  [10.419691, 105.643799], // Ví dụ: Giảng đường A
+  [10.421060, 105.643770], // Ví dụ: Thư viện
+  [10.421669, 105.643866], // Ví dụ: Ký túc xá
+  
+];
+
+// Vẽ đường đi
+const polyline = L.polyline(path, {
+  color: 'blue',      // màu đường
+  weight: 4,          // độ dày
+  opacity: 0.7        // độ trong suốt
+}).addTo(map);
+
+// Zoom bản đồ vừa khít đường đi
+map.fitBounds(polyline.getBounds());
     campusPOIs.forEach(p => {
-      const inside = campusPolygon ? pointInPolygon([p.lat, p.lng], campusPolygon) : true;
-      if (!inside) return;
+      
       const marker = L.marker([p.lat, p.lng], { icon: buildPoiIcon(p.name) });
             marker.on('click', () => {
         const meta = { name: p.name, description: p.description, display_name: p.name };

@@ -11,6 +11,7 @@
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
         <link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet">
 
+        <link rel="icon" type="image/x-icon" href="{% static 'app/images/favicon.ico' %}">
         <!-- CSS custom -->
         <link rel="stylesheet" href="{% static 'app/css/styles.css' %}">
     </head>
@@ -20,7 +21,7 @@
             <nav class="sidebar">
                 <button class="sidebar-item" onclick="toggleForm()">
                     <span class="sidebar-icon"><i class="fa-solid fa-route"></i></span>
-                    <span class="sidebar-label">Tìm đường</span>
+                    <span class="sidebar-label">Tìm</span>
                 </button>
                 <hr class="sidebar-divider">
                     <button id="loc-btn" class="sidebar-item" onclick="getCurrentLocation()" aria-label="Vị trí">

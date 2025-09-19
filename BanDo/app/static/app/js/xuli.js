@@ -690,10 +690,10 @@ function attachEventHandlers() {
     if (closeBtn) closeBtn.addEventListener('click', closeOverlay);
 
     const btnStart = document.getElementById('set-as-start');
-    if (btnStart) btnStart.addEventListener('click', () => { setAsStart(latlng); closeOverlay(); });
+    if (btnStart) btnStart.addEventListener('click', () => { setAsStart(latlng, meta?.name || meta?.display_name || ''); closeOverlay(); });
 
     const btnEnd = document.getElementById('set-as-end');
-    if (btnEnd) btnEnd.addEventListener('click', () => { setAsEnd(latlng); closeOverlay(); });
+    if (btnEnd) btnEnd.addEventListener('click', () => { setAsEnd(latlng, meta?.name || meta?.display_name || ''); closeOverlay(); });
 
     setHighlightMarker(latlng);
   }
@@ -776,26 +776,7 @@ function attachEventHandlers() {
       { id: 'pool',     name: 'Hồ bơi',         lat: 10.422321, lng: 105.640886, description: 'Hồ bơi' }
       
     ];
-     // Tập hợp các tọa độ [lat, lng]
-const path = [
-  [10.420825, 105.644397], // Ví dụ: Sân soccer
-  [10.420781, 105.644899], // Ví dụ: Khu thí nghiệm
-  [10.419691, 105.643799], // Ví dụ: Giảng đường A
-  [10.421060, 105.643770], // Ví dụ: Thư viện
-  [10.421669, 105.643866], // Ví dụ: Ký túc xá
-  
-];
-
-// Vẽ đường đi
-const polyline = L.polyline(path, {
-  color: 'blue',      // màu đường
-  weight: 4,          // độ dày
-  opacity: 0.7        // độ trong suốt
-}).addTo(map);
-
-// Zoom bản đồ vừa khít đường đi
-map.fitBounds(polyline.getBounds());
-    campusPOIs.forEach(p => {
+         campusPOIs.forEach(p => {
       
       const marker = L.marker([p.lat, p.lng], { icon: buildPoiIcon(p.name) });
             marker.on('click', () => {
@@ -809,21 +790,468 @@ map.fitBounds(polyline.getBounds());
     });
   }
 
-  // Thu gọn step từ OSRM để hiển thị
-  function extractStepsFromOSRM(route) {
-    const result = [];
-    if (!route || !Array.isArray(route.legs)) return result;
-    route.legs.forEach(leg => {
-      (leg.steps || []).forEach(step => {
-        const man = step.maneuver || {};
-        const parts = [];
-        if (man.type) parts.push(man.type);
-        if (man.modifier) parts.push(man.modifier);
-        if (step.name) parts.push(step.name);
-        result.push({ distance: step.distance, duration: step.duration, instruction: parts.join(' ') });
-      });
-    });
-    return result;
+  
+  // Tuyến thủ công nội bộ (polyline) giữa các POI trong khuôn viên
+  const CAMPUS_PATH_ORDER = [
+    { name: 'Sân soccer',     lat: 10.420825, lng: 105.644397 },
+    { name: 'Khu thí nghiệm', lat: 10.420781, lng: 105.644899 },
+    { name: 'Giảng đường A',  lat: 10.419691, lng: 105.643799 },
+    { name: 'Thư viện',       lat: 10.421060, lng: 105.643770 },
+    { name: 'Ký túc xá',      lat: 10.421669, lng: 105.643866 }
+  ];
+
+  // Tuyến thủ công (màu tím) trong khuôn viên, dùng khi hai điểm gần tuyến này
+  const CAMPUS_MANUAL_PATH = [
+    [10.420825, 105.644397], // Sân soccer
+    [10.420781, 105.644899], // Khu thí nghiệm
+    [10.419691, 105.643799], // Giảng đường A
+    [10.421060, 105.643770], // Thư viện
+    [10.421669, 105.643866]  // Ký túc xá
+  ];
+
+  // ==== Lưới lối đi (walkway) – vẽ bằng các polyline bám "khoảng trống" ====
+  // Có thể thêm/bớt các đoạn để bám đúng lối đi thực tế. Tuyến sẽ tìm đường ngắn nhất trên lưới này.
+  const WALKWAY_NETWORK = [
+    // Nhánh bắc: Sân basketball → B4 → Nhà xe cổng C → Cổng C
+    [ [10.421696,105.642917], [10.420982, 105.642103], [10.421181, 105.642295], [10.421073,105.642450], [10.421031,105.641932] ],
+    // Nhánh về Cổng B qua B2, B1
+    [ [10.421073,105.642450], [10.420904,105.642823], [10.420717,105.642506], [10.420366,105.642533] ],
+    // Nhánh B3 → Thư viện → Nhà xe B → Ký túc xá
+    [ [10.421105,105.643024], [10.421060,105.643770], [10.421197,105.643890], [10.421669,105.643866] ],
+    // Nhánh A1 → Giảng đường A → A7 → A9
+    [ [10.420419,105.643402], [10.419691,105.643799], [10.419032,105.643874], [10.418984,105.644384] ],
+    // Nhánh Giảng đường A → H2 → A8 → T1 → T3 → Trường mẫu giáo
+    [ [10.419691,105.643799], [10.419686,105.644293], [10.419274,105.644832], [10.419760,105.644797], [10.419385,105.645060], [10.418921,105.644955] ],
+    // Nhánh Ký túc xá → T1 (đi mép phía đông)
+    [ [10.421669,105.643866], [10.421400,105.644200], [10.420600,105.644550], [10.419760,105.644797] ],
+    // Nhánh Sân soccer → Khu thí nghiệm
+    [ [10.420825,105.644397], [10.420781,105.644899] ],
+    // Nhánh nối trung tâm: B4 ↔ B3 ↔ B2 ↔ B1
+    [ [10.421303,105.643228], [10.421105,105.643024], [10.420904,105.642823], [10.420717,105.642506] ]
+  ];
+
+  function _round6(x){ return Math.round(x*1e6)/1e6; }
+  function _hashLL(lat,lng){ return `${_round6(lat)},${_round6(lng)}`; }
+
+  function buildWalkwayGraph(){
+    const nodes = new Map(); // key -> {id, lat, lng}
+    const adj = new Map();   // id -> [{to, weight}]
+    let idSeq = 0;
+    function ensureNode(lat,lng){
+      const key = _hashLL(lat,lng);
+      if (!nodes.has(key)) nodes.set(key, { id: `n${++idSeq}`, lat, lng });
+      return nodes.get(key);
+    }
+    function link(a,b){
+      const w = haversineMeters(a.lat,a.lng,b.lat,b.lng);
+      if (!adj.has(a.id)) adj.set(a.id, []);
+      if (!adj.has(b.id)) adj.set(b.id, []);
+      adj.get(a.id).push({ to: b.id, weight: w });
+      adj.get(b.id).push({ to: a.id, weight: w });
+    }
+    for (const line of WALKWAY_NETWORK){
+      for (let i=1;i<line.length;i++){
+        const p1 = ensureNode(line[i-1][0], line[i-1][1]);
+        const p2 = ensureNode(line[i][0], line[i][1]);
+        link(p1,p2);
+      }
+    }
+    // Trả về lookup theo id và các danh sách hỗ trợ
+    const nodesById = new Map();
+    for (const n of nodes.values()) nodesById.set(n.id, n);
+    return { nodesById, adj };
+  }
+
+  function findNearestWalkNode(graph, lat, lng){
+    let bestId=null, best=Infinity;
+    for (const [id,n] of graph.nodesById.entries()){
+      const d = haversineMeters(lat,lng,n.lat,n.lng);
+      if (d<best){ best=d; bestId=id; }
+    }
+    return { id: bestId, dist: best };
+  }
+
+  function dijkstraById(graph, srcId, dstId){
+    const dist = new Map();
+    const prev = new Map();
+    const visited = new Set();
+    for (const id of graph.nodesById.keys()) dist.set(id, Infinity);
+    dist.set(srcId, 0);
+    while (visited.size < graph.nodesById.size){
+      let u=null, best=Infinity;
+      for (const [k,v] of dist.entries()){
+        if (visited.has(k)) continue;
+        if (v<best){ best=v; u=k; }
+      }
+      if (u==null || best===Infinity) break;
+      visited.add(u);
+      if (u===dstId) break;
+      const neighbors = graph.adj.get(u) || [];
+      for (const nb of neighbors){
+        const alt = dist.get(u) + nb.weight;
+        if (alt < dist.get(nb.to)){
+          dist.set(nb.to, alt);
+          prev.set(nb.to, u);
+        }
+      }
+    }
+    if (!prev.has(dstId) && srcId!==dstId) return null;
+    const pathIds = [];
+    let cur = dstId; pathIds.push(cur);
+    while (cur!==srcId){
+      const p = prev.get(cur); if (!p) break; pathIds.push(p); cur = p;
+    }
+    pathIds.reverse();
+    return pathIds;
+  }
+
+  const WALKWAY_NEAR_THRESH_M = 120; // khoảng cách tối đa để coi là ở gần lưới lối đi
+  function tryWalkwayRoute(s,e){
+    const g = buildWalkwayGraph();
+    const ns = findNearestWalkNode(g, s[0], s[1]);
+    const ne = findNearestWalkNode(g, e[0], e[1]);
+    if (!ns.id || !ne.id || (ns.dist>WALKWAY_NEAR_THRESH_M && ne.dist>WALKWAY_NEAR_THRESH_M)) return null;
+    const ids = dijkstraById(g, ns.id, ne.id);
+    if (!ids || !ids.length) return null;
+    const coords = [];
+    coords.push([s[0], s[1]]);
+    for (const id of ids){ const n = g.nodesById.get(id); coords.push([n.lat, n.lng]); }
+    coords.push([e[0], e[1]]);
+    return coords;
+  }
+
+  // ==== Beeline A* trên lưới tránh vật cản (đi theo khoảng trống như bạn vẽ) ====
+  function getCampusObstacles(){
+    const items = [
+      ['Tòa B1',10.420717,105.642506,18], ['Tòa B2',10.420904,105.642823,18], ['Tòa B3',10.421105,105.643024,18],
+      ['Tòa B4',10.421303,105.643228,20], ['Tòa B5',10.421485,105.643474,22], ['Tòa C1',10.421712,105.641854,22],
+      ['Tòa C2',10.422120,105.641495,22], ['Tòa A1',10.420419,105.643402,18], ['Tòa A4',10.420327,105.643968,18],
+      ['Tòa A7',10.419032,105.643874,18], ['Tòa A8',10.419274,105.644832,18], ['Tòa A9',10.418984,105.644384,18],
+      ['Tòa T1',10.419760,105.644797,18], ['Tòa T3',10.419385,105.645060,18], ['Tòa H1',10.420601,105.643611,18],
+      ['Tòa H2',10.419686,105.644293,18], ['Tòa H3',10.420142,105.644641,18], ['Nhà thi đấu đa năng',10.421258,105.642284,36],
+      ['Thư viện',10.421060,105.643770,22], ['Ký túc xá',10.421669,105.643866,22], ['Hiệu bộ',10.420409,105.642938,18],
+      ['Nhà xe cổng B',10.421197,105.643890,16], ['Nhà xe cổng C',10.421073,105.642450,16],
+      ['Sân pickleball',10.421511,105.642616,14], ['Sân basketball',10.421696,105.642917,16],
+      // Dải cản đường chéo (chặn lối chéo cắt qua khối giữa pickleball → B5)
+    
+    ];
+    return items.map(x=>({ name:x[0], lat:x[1], lng:x[2], r:x[3] }));
+  }
+  function metersPerDeg(lat){
+    const latM = 111320; const lngM = 111320 * Math.cos((lat||10.4205)*Math.PI/180);
+    return { latM, lngM };
+  }
+  function project(lat0,lng0,lat,lng){ const sc = metersPerDeg(lat0); return { x:(lng-lng0)*sc.lngM, y:(lat-lat0)*sc.latM }; }
+  function unproject(lat0,lng0,x,y){ const sc = metersPerDeg(lat0); return { lat: y/sc.latM + lat0, lng: x/sc.lngM + lng0 }; }
+
+  function rdpSimplify(points, eps){
+    if (!points || points.length<=2) return points||[];
+    function perpDist(p,a,b){
+      const x=a[1],y=a[0], x2=b[1],y2=b[0], x0=p[1],y0=p[0];
+      const dx=x2-x, dy=y2-y; if (dx===0&&dy===0) return Math.hypot(x0-x,y0-y);
+      const t=((x0-x)*dx+(y0-y)*dy)/(dx*dx+dy*dy); const px=x+t*dx, py=y+t*dy; return Math.hypot(x0-px,y0-py);
+    }
+    function rec(pts){
+      let maxD=0, idx=0; const a=pts[0], b=pts[pts.length-1];
+      for (let i=1;i<pts.length-1;i++){ const d=perpDist(pts[i],a,b); if (d>maxD){maxD=d; idx=i;} }
+      if (maxD>eps){ const p1=rec(pts.slice(0,idx+1)); const p2=rec(pts.slice(idx)); return p1.slice(0,-1).concat(p2); }
+      return [a,b];
+    }
+    return rec(points);
+  }
+
+  function tryBeelineGridRoute(s,e){
+    if (!Array.isArray(s)||!Array.isArray(e)) return null;
+    const obs = getCampusObstacles();
+    const lat0 = 10.4208, lng0 = 105.6438; // gốc quy chiếu gần khuôn viên
+    const ps = project(lat0,lng0,s[0],s[1]);
+    const pe = project(lat0,lng0,e[0],e[1]);
+    let minX = Math.min(ps.x,pe.x), maxX = Math.max(ps.x,pe.x);
+    let minY = Math.min(ps.y,pe.y), maxY = Math.max(ps.y,pe.y);
+    for (const o of obs){ const p=project(lat0,lng0,o.lat,o.lng); minX=Math.min(minX,p.x-o.r-40); maxX=Math.max(maxX,p.x+o.r+40); minY=Math.min(minY,p.y-o.r-40); maxY=Math.max(maxY,p.y+o.r+40); }
+    const cell = 3; // mét/ô (mịn hơn để bám sát khoảng trống)
+    const w = Math.max(10, Math.ceil((maxX-minX)/cell)+1);
+    const h = Math.max(10, Math.ceil((maxY-minY)/cell)+1);
+    const block = new Uint8Array(w*h);
+    function idx(ix,iy){ return iy*w+ix; }
+    function cellCenter(ix,iy){ return { x: minX + ix*cell, y: minY + iy*cell }; }
+    // mark obstacles
+    for (let iy=0; iy<h; iy++){
+      for (let ix=0; ix<w; ix++){
+        const c = cellCenter(ix,iy);
+        for (const o of obs){
+          const po = project(lat0,lng0,o.lat,o.lng); const d = Math.hypot(c.x-po.x, c.y-po.y);
+          if (d <= o.r) { block[idx(ix,iy)] = 1; break; }
+        }
+      }
+    }
+    function clampCellNear(xm,ym){
+      let ix = Math.round((xm-minX)/cell), iy = Math.round((ym-minY)/cell);
+      ix = Math.max(0, Math.min(w-1, ix)); iy = Math.max(0, Math.min(h-1, iy));
+      if (!block[idx(ix,iy)]) return {ix,iy};
+      // tìm ô trống gần nhất (BFS nhỏ)
+      const q=[[ix,iy]], seen=new Set([idx(ix,iy)]);
+      const dirs=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+      while(q.length){ const [cx,cy]=q.shift(); for (const d of dirs){ const nx=cx+d[0], ny=cy+d[1]; if(nx<0||ny<0||nx>=w||ny>=h) continue; const k=idx(nx,ny); if(seen.has(k)) continue; seen.add(k); if(!block[k]) return {ix:nx,iy:ny}; q.push([nx,ny]); } }
+      return {ix,iy};
+    }
+    const sCell = clampCellNear(ps.x, ps.y); const eCell = clampCellNear(pe.x, pe.y);
+    // A* octile
+    const D=1, D2=1.5; // tăng chi phí đi chéo để hạn chế cắt góc
+    const gScore = new Float32Array(w*h); for (let i=0;i<gScore.length;i++) gScore[i]=Infinity;
+    const fScore = new Float32Array(w*h); for (let i=0;i<fScore.length;i++) fScore[i]=Infinity;
+    const prev = new Int32Array(w*h); for (let i=0;i<prev.length;i++) prev[i]=-1;
+    const start = idx(sCell.ix, sCell.iy), goal = idx(eCell.ix, eCell.iy);
+    gScore[start]=0;
+    function hCost(a,b){ const ax=a%w, ay=(a/w)|0, bx=b%w, by=(b/w)|0; const dx=Math.abs(ax-bx), dy=Math.abs(ay-by); return D*(dx+dy) + (D2-2*D)*Math.min(dx,dy); }
+    fScore[start] = hCost(start, goal);
+    const open = new Set([start]);
+    const nbrs = [[1,0,D],[0,1,D],[-1,0,D],[0,-1,D],[1,1,D2],[1,-1,D2],[-1,1,D2],[-1,-1,D2]];
+    while(open.size){
+      let cur=-1, best=Infinity; for (const k of open){ if (fScore[k] < best){ best=fScore[k]; cur=k; } }
+      if (cur===goal) break;
+      open.delete(cur);
+      const cx=cur%w, cy=(cur/w)|0;
+      for (const d of nbrs){ const nx=cx+d[0], ny=cy+d[1]; if(nx<0||ny<0||nx>=w||ny>=h) continue; const ni=idx(nx,ny); if(block[ni]) continue; const tentative=gScore[cur]+d[2]; if(tentative<gScore[ni]){ prev[ni]=cur; gScore[ni]=tentative; fScore[ni]=tentative+hCost(ni, goal); open.add(ni);} }
+    }
+    if (prev[goal]===-1 && goal!==start) return null;
+    const path=[]; let cur=goal; path.push(cur); while(cur!==start){ cur=prev[cur]; if (cur<0) break; path.push(cur); } path.reverse();
+    // build coords
+    const pts=[]; pts.push([s[0], s[1]]);
+    for (const p of path){ const cx=p%w, cy=(p/w)|0; const c=cellCenter(cx,cy); const ll=unproject(lat0,lng0,c.x,c.y); pts.push([ll.lat, ll.lng]); }
+    pts.push([e[0], e[1]]);
+    // simplify ~ 2-4 m
+    const simp = rdpSimplify(pts, 0.000015); // ~1.5-2 m, giảm nguy cơ cắt qua mép toà
+    return simp;
+  }
+
+  // ==== Đồ thị tuyến nội bộ trong khuôn viên (shortest path) ====
+  // Dùng các POI làm nút và định nghĩa các cạnh nội bộ, tính đường ngắn nhất bằng Dijkstra
+  function buildCampusGraph(){
+    const nodes = new Map();
+    const poiTable = {
+      'Cổng C': [10.421031,105.641932],
+      'Cổng B': [10.420366,105.642533],
+      'Tòa B1': [10.420717,105.642506],
+      'Tòa B2': [10.420904,105.642823],
+      'Tòa B3': [10.421105,105.643024],
+      'Tòa B4': [10.421303,105.643228],
+      'Tòa B5': [10.421485,105.643474],
+      'Tòa C1': [10.421712,105.641854],
+      'Tòa C2': [10.422120,105.641495],
+      'Tòa A1': [10.420419,105.643402],
+      'Tòa A4': [10.420327,105.643968],
+      'Tòa A7': [10.419032,105.643874],
+      'Tòa A8': [10.419274,105.644832],
+      'Tòa A9': [10.418984,105.644384],
+      'Tòa T1': [10.419760,105.644797],
+      'Tòa T3': [10.419385,105.645060],
+      'Tòa H1': [10.420601,105.643611],
+      'Tòa H2': [10.419686,105.644293],
+      'Tòa H3': [10.420142,105.644641],
+      'Nhà thi đấu đa năng': [10.421258,105.642284],
+      'Sân pickleball': [10.421511,105.642616],
+      'Sân basketball': [10.421696,105.642917],
+      'Sân soccer': [10.420825,105.644397],
+      'Khu thí nghiệm': [10.420781,105.644899],
+      'Giảng đường A': [10.419691,105.643799],
+      'Thư viện': [10.421060,105.643770],
+      'Ký túc xá': [10.421669,105.643866],
+      'Hiệu bộ': [10.420409,105.642938],
+      'Nhà xe cổng B': [10.421197,105.643890],
+      'Nhà xe cổng C': [10.421073,105.642450],
+      'Trường mẫu giáo': [10.418921,105.644955],
+      'Hồ bơi': [10.422321,105.640886]
+    };
+    for (const [nm,ll] of Object.entries(poiTable)) nodes.set(nm, {lat: ll[0], lng: ll[1]});
+
+    const E = [
+      ['Cổng C','Nhà xe cổng C'], ['Cổng C','Tòa C1'], ['Tòa C1','Tòa C2'],
+      ['Nhà xe cổng C','Tòa B2'], ['Tòa B2','Tòa B1'], ['Tòa B2','Tòa B3'], ['Tòa B3','Tòa B4'], ['Tòa B4','Tòa B5'],
+      ['Cổng B','Tòa B1'], ['Cổng B','Hiệu bộ'], ['Hiệu bộ','Tòa B1'],
+      ['Tòa B1','Tòa A1'], ['Tòa A1','Tòa H1'], ['Tòa H1','Thư viện'],
+      ['Thư viện','Tòa B4'], ['Thư viện','Nhà xe cổng B'], ['Tòa B4','Tòa B5'], ['Nhà xe cổng B','Tòa B3'],
+      ['Tòa A1','Tòa A4'], ['Tòa A4','Giảng đường A'], ['Giảng đư��ng A','Tòa A7'], ['Tòa A7','Tòa A9'],
+      ['Giảng đường A','Tòa H2'], ['Tòa H2','Tòa H3'], ['Tòa H2','Tòa A8'], ['Tòa A8','Tòa T1'], ['Tòa T1','Tòa T3'],
+      ['Tòa A8','Tòa A9'], ['Tòa T3','Trường mẫu giáo'],
+      ['Tòa B4','Sân basketball'], ['Sân basketball','Tòa B5'], ['Sân basketball','Sân pickleball'],
+      ['Ký túc xá','Tòa B5'], ['Ký túc xá','Thư viện'],
+      ['Tòa T1','Khu thí nghiệm'], ['Khu thí nghiệm','Sân soccer']
+    ];
+
+    const adj = new Map();
+    for (const [a,b] of E){
+      if(!nodes.has(a) || !nodes.has(b)) continue;
+      const A = nodes.get(a), B = nodes.get(b);
+      const w = haversineMeters(A.lat, A.lng, B.lat, B.lng);
+      if (!adj.has(a)) adj.set(a, []);
+      if (!adj.has(b)) adj.set(b, []);
+      adj.get(a).push({to:b, weight:w});
+      adj.get(b).push({to:a, weight:w});
+    }
+    return { nodes, adj };
+  }
+
+  const CAMPUS_ROUTER_NEAR_NODE_M = 350; // khoảng cách coi là "gần" mạng lưới
+
+  function findNearestGraphNode(graph, lat, lng){
+    let name=null, best=Infinity;
+    for (const [nm,ll] of graph.nodes.entries()){
+      const d = haversineMeters(lat,lng,ll.lat,ll.lng);
+      if (d<best){ best=d; name=nm; }
+    }
+    return { name, dist: best };
+  }
+
+  function dijkstraShortestPath(graph, src, dst){
+    const dist = new Map();
+    const prev = new Map();
+    const visited = new Set();
+    for (const k of graph.nodes.keys()) dist.set(k, Infinity);
+    dist.set(src, 0);
+
+    while (visited.size < graph.nodes.size){
+      let u=null, best=Infinity;
+      for (const [k,v] of dist.entries()){
+        if (visited.has(k)) continue;
+        if (v<best){ best=v; u=k; }
+      }
+      if (u==null || best===Infinity) break;
+      visited.add(u);
+      if (u===dst) break;
+      const neighbors = graph.adj.get(u) || [];
+      for (const nb of neighbors){
+        const alt = dist.get(u) + nb.weight;
+        if (alt < dist.get(nb.to)){
+          dist.set(nb.to, alt);
+          prev.set(nb.to, u);
+        }
+      }
+    }
+    if (!prev.has(dst) && src!==dst) return null;
+    const path = [];
+    let cur = dst;
+    path.push(cur);
+    while (cur!==src){
+      const p = prev.get(cur);
+      if (p==null){ break; }
+      path.push(p);
+      cur = p;
+    }
+    path.reverse();
+    return path;
+  }
+
+  function buildCoordsFromNodePath(graph, nodePath){
+    const coords = [];
+    for (let i=0;i<nodePath.length;i++){
+      const nm = nodePath[i];
+      const ll = graph.nodes.get(nm);
+      coords.push([ll.lat, ll.lng]);
+    }
+    return coords;
+  }
+
+  function tryCampusShortestRoute(s, e){
+    const graph = buildCampusGraph();
+    const ns = findNearestGraphNode(graph, s[0], s[1]);
+    const ne = findNearestGraphNode(graph, e[0], e[1]);
+    if (ns.dist > CAMPUS_ROUTER_NEAR_NODE_M && ne.dist > CAMPUS_ROUTER_NEAR_NODE_M) return null;
+    const nodePath = dijkstraShortestPath(graph, ns.name, ne.name);
+    if (!nodePath || nodePath.length<1) return null;
+    const routeCoords = [];
+    routeCoords.push([s[0], s[1]]);
+    const body = buildCoordsFromNodePath(graph, nodePath);
+    for (const c of body) routeCoords.push(c);
+    routeCoords.push([e[0], e[1]]);
+    return routeCoords;
+  }
+
+  function nearestIndexAndDistanceOnManualPath(lat, lng){
+    let bestIdx = -1, best = Infinity;
+    for (let i=0;i<CAMPUS_MANUAL_PATH.length;i++){
+      const [pLat, pLng] = CAMPUS_MANUAL_PATH[i];
+      const d = haversineMeters(lat, lng, pLat, pLng);
+      if (d < best) { best = d; bestIdx = i; }
+    }
+    return { idx: bestIdx, dist: best };
+  }
+
+  function sliceManualPath(i, j){
+    if (i === j) return null;
+    const a = Math.min(i, j), b = Math.max(i, j);
+    return CAMPUS_MANUAL_PATH.slice(a, b+1);
+  }
+
+  // Ngưỡng snap lên tuyến tím (nới lỏng để ưu tiên tuyến nội bộ)
+  const MANUAL_SNAP_THRESHOLD_M = 800;
+
+  // Xây coords theo kiểu: [start] + [đoạn tuyến tím giữa 2 nút gần nhất] + [end]
+  function buildSnappedManualRouteCoords(s, e){
+    if (!Array.isArray(s) || !Array.isArray(e)) return null;
+    const ns = nearestIndexAndDistanceOnManualPath(s[0], s[1]);
+    const ne = nearestIndexAndDistanceOnManualPath(e[0], e[1]);
+    if (ns.idx < 0 || ne.idx < 0) return null;
+    const bothFar = ns.dist > MANUAL_SNAP_THRESHOLD_M && ne.dist > MANUAL_SNAP_THRESHOLD_M;
+    if (bothFar) return null;
+    if (ns.idx === ne.idx) {
+      const node = CAMPUS_MANUAL_PATH[ns.idx];
+      if (!node) return null;
+      return [ [s[0], s[1]], [node[0], node[1]], [e[0], e[1]] ];
+    }
+    const seg = sliceManualPath(ns.idx, ne.idx);
+    if (!Array.isArray(seg) || seg.length < 2) return [ [s[0], s[1]], [e[0], e[1]] ];
+    return [ [s[0], s[1]], ...seg, [e[0], e[1]] ];
+  }
+
+  function _normLabel(s){
+    return String(s||'')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .trim().toLowerCase();
+  }
+
+  // Nếu tên start/end trùng các điểm trong CAMPUS_PATH_ORDER, xây dựng polyline đi theo thứ tự đã định.
+  function buildManualPathFromLabels(startLabel, endLabel){
+    const a = _normLabel(startLabel), b = _normLabel(endLabel);
+    if (!a || !b) return null;
+    const i = CAMPUS_PATH_ORDER.findIndex(p => _normLabel(p.name) === a);
+    const j = CAMPUS_PATH_ORDER.findIndex(p => _normLabel(p.name) === b);
+    if (i === -1 || j === -1 || i === j) return null;
+    const segment = i <= j ? CAMPUS_PATH_ORDER.slice(i, j+1) : CAMPUS_PATH_ORDER.slice(j, i+1).reverse();
+    return segment.map(p => [p.lat, p.lng]);
+  }
+
+  function haversineMeters(lat1, lon1, lat2, lon2){
+    const R = 6371000; // m
+    const toRad = (x) => x * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const la1 = toRad(lat1); const la2 = toRad(lat2);
+    const h = Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLon/2)**2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+  function totalPathDistanceMeters(coords){
+    let sum = 0;
+    for (let k=1;k<coords.length;k++){
+      const [aLat, aLng] = coords[k-1];
+      const [bLat, bLng] = coords[k];
+      sum += haversineMeters(aLat, aLng, bLat, bLng);
+    }
+    return sum;
+  }
+
+  function drawManualRouteCoords(coords){
+    if (!Array.isArray(coords) || coords.length < 2) return;
+    if (routeLine) { removeLayerIfExists(routeLine); routeLine = null; }
+    routeLine = L.polyline(coords, { color: '#7c3aed', weight: 6, opacity: 0.9 }).addTo(map);
+    const b = routeLine.getBounds();
+    if (b && typeof b.isValid === 'function' && b.isValid()) map.fitBounds(b, { padding: [28, 28] });
+    const dist = totalPathDistanceMeters(coords);
+    const speedMps = 1.2; // ~4.3 km/h
+    const dur = dist / speedMps;
+    renderRouteInfo({ distance: dist, duration: dur });
+    if (startMarker) { removeLayerIfExists(startMarker); startMarker = null; }
+    if (endMarker) { removeLayerIfExists(endMarker); endMarker = null; }
   }
 
   // Tính toán và vẽ lộ trình (OSRM)
@@ -831,6 +1259,14 @@ map.fitBounds(polyline.getBounds());
     const s = await resolveInputCoords(startEl);
     const e = await resolveInputCoords(endEl);
 
+    // Ưu tiên 0: Beeline A* trên lưới tránh vật cản (đi đúng khoảng trống như bạn vẽ)
+    const gridCoords = tryBeelineGridRoute(s, e);
+    if (Array.isArray(gridCoords) && gridCoords.length >= 2) {
+      drawManualRouteCoords(gridCoords);
+      return;
+    }
+
+    
     if (!Array.isArray(s) || !Array.isArray(e)) throw new Error('Vui lòng nhập địa chỉ hoặc toạ độ hợp lệ cho cả hai điểm.');
 
     // Cập nhật marker start/end (không kích hoạt tìm lại trong khi đang tính)

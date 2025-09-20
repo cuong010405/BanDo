@@ -56,10 +56,11 @@ document.addEventListener('DOMContentLoaded', function () {
   // ====== Khởi tạo bản đồ ======
   function initMap() {
     map = L.map(mapEl, {
-      center: [10.4209, 105.6439],
+      center: [10.4209, 105.6439],  // tâm khuôn viên
       zoom: 17,
-      minZoom: 2,
-      maxZoom: 20
+      minZoom: 16,                  // zoom nhỏ nhất cho phép
+      maxZoom: 20,                  // zoom lớn nhất cho phép
+
     });
     const bounds = [
     [10.4180, 105.6405],

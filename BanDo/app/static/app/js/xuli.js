@@ -61,6 +61,12 @@ document.addEventListener('DOMContentLoaded', function () {
       minZoom: 2,
       maxZoom: 20
     });
+    const bounds = [
+    [10.4180, 105.6405],
+    [10.4230, 105.6460]
+  ];
+  map.setMaxBounds(bounds);
+  map.setMaxBoundsViscosity = 1.0; // dính chặt biên, không kéo ra ngoài
 
     // Lớp nền OSM
     L.tileLayer('https://cartodb-basemaps-a.global.ssl.fastly.net/light_nolabels/{z}/{x}/{y}{r}.png', {

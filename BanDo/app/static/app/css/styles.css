@@ -9,6 +9,22 @@
 html, body { height: 100%; margin: 0; }
 body { background: var(--bg); color: #e5e7eb; font-family: sans-serif; }
 
+/* Route info panel */
+#route-info {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 999;
+  background: rgba(11, 18, 32, 0.92);
+  color: #e5e7eb;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  min-width: 220px;
+  box-shadow: 0 8px 22px rgba(0,0,0,.45);
+  font-size: 14px;
+}
+
 /* Layout: Sidebar trái + Map phải */
 .bo-cuc-chinh {
   display: grid;
@@ -405,6 +421,17 @@ body { background: var(--bg); color: #e5e7eb; font-family: sans-serif; }
 /* Nhấn mạnh mũi tên hướng */
 .user-heading-icon path {
   filter: drop-shadow(0 0 3px rgba(34, 211, 238, 0.7));
+}
+
+.leaflet-control-custom {
+  background: white !important;
+  border: 2px solid #ccc !important;
+  border-radius: 4px !important;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.65) !important;
+}
+
+.leaflet-control-custom:hover {
+  background: #f0f0f0 !important;
 }
 
 

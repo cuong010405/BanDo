@@ -1045,8 +1045,6 @@ function attachEventHandlers() {
 
   function tryBeelineGridRoute(s,e){
     if (!Array.isArray(s)||!Array.isArray(e)) return null;
-    // Chỉ chạy beeline nếu cả hai điểm thực sự ở gần khuôn viên để tránh tính toán nặng
-    if (!(isNearCampus(s[0], s[1], BEELINE_CAMPUS_RADIUS_M) && isNearCampus(e[0], e[1], BEELINE_CAMPUS_RADIUS_M))) return null;
     const obs = getCampusObstacles();
     const lat0 = 10.4208, lng0 = 105.6438; // gốc quy chiếu gần khuôn viên
     const ps = project(lat0,lng0,s[0],s[1]);
@@ -1057,7 +1055,6 @@ function attachEventHandlers() {
     const cell = 3; // mét/ô (mịn hơn để bám sát khoảng trống)
     const w = Math.max(10, Math.ceil((maxX-minX)/cell)+1);
     const h = Math.max(10, Math.ceil((maxY-minY)/cell)+1);
-    if (w*h > BEELINE_MAX_GRID_CELLS) return null; // tránh khối lưới quá lớn gây đơ trình duyệt
     const block = new Uint8Array(w*h);
     function idx(ix,iy){ return iy*w+ix; }
     function cellCenter(ix,iy){ return { x: minX + ix*cell, y: minY + iy*cell }; }
@@ -1114,152 +1111,69 @@ function attachEventHandlers() {
   // ==== Đồ thị tuyến nội bộ trong khuôn viên (shortest path) ====
   // Dùng các POI làm nút và định nghĩa các cạnh nội bộ, tính đường ngắn nhất bằng Dijkstra
   function buildCampusGraph(){
-  const nodes = new Map();
+    const nodes = new Map();
+    const poiTable = {
+      'Cổng C': [10.421031,105.641932],
+      'Cổng B': [10.420366,105.642533],
+      'Tòa B1': [10.420717,105.642506],
+      'Tòa B2': [10.420904,105.642823],
+      'Tòa B3': [10.421105,105.643024],
+      'Tòa B4': [10.421303,105.643228],
+      'Tòa B5': [10.421485,105.643474],
+      'Tòa C1': [10.421712,105.641854],
+      'Tòa C2': [10.422120,105.641495],
+      'Tòa A1': [10.420419,105.643402],
+      'Tòa A4': [10.420327,105.643968],
+      'Tòa A7': [10.419032,105.643874],
+      'Tòa A8': [10.419274,105.644832],
+      'Tòa A9': [10.418984,105.644384],
+      'Tòa T1': [10.419760,105.644797],
+      'Tòa T3': [10.419385,105.645060],
+      'Tòa H1': [10.420601,105.643611],
+      'Tòa H2': [10.419686,105.644293],
+      'Tòa H3': [10.420142,105.644641],
+      'Nhà thi đấu đa năng': [10.421258,105.642284],
+      'Sân pickleball': [10.421511,105.642616],
+      'Sân basketball': [10.421696,105.642917],
+      'Sân soccer': [10.420825,105.644397],
+      'Khu thí nghiệm': [10.420781,105.644899],
+      'Giảng đường A': [10.419691,105.643799],
+      'Thư viện': [10.421060,105.643770],
+      'Ký túc xá': [10.421669,105.643866],
+      'Hiệu bộ': [10.420409,105.642938],
+      'Nhà xe cổng B': [10.421197,105.643890],
+      'Nhà xe cổng C': [10.421073,105.642450],
+      'Trường mẫu giáo': [10.418921,105.644955],
+      'Hồ bơi': [10.422321,105.640886]
+    };
+    for (const [nm,ll] of Object.entries(poiTable)) nodes.set(nm, {lat: ll[0], lng: ll[1]});
 
-  const poiTable = {
-    'Cổng C': [10.421031,105.641932],
-    'Cổng B': [10.420366,105.642533],
-    'Tòa B1': [10.420717,105.642506],
-    'Tòa B2': [10.420904,105.642823],
-    'Tòa B3': [10.421105,105.643024],
-    'Tòa B4': [10.421303,105.643228],
-    'Tòa B5': [10.421485,105.643474],
-    'Tòa C1': [10.421712,105.641854],
-    'Tòa C2': [10.422120,105.641495],
-    'Tòa A1': [10.420419,105.643402],
-    'Tòa A4': [10.420327,105.643968],
-    'Tòa A7': [10.419032,105.643874],
-    'Tòa A8': [10.419274,105.644832],
-    'Tòa A9': [10.418984,105.644384],
-    'Tòa T1': [10.419760,105.644797],
-    'Tòa T3': [10.419385,105.645060],
-    'Tòa H1': [10.420601,105.643611],
-    'Tòa H2': [10.419686,105.644293],
-    'Tòa H3': [10.420142,105.644641],
-    'Nhà thi đấu đa năng': [10.421258,105.642284],
-    'Sân pickleball': [10.421511,105.642616],
-    'Sân basketball': [10.421696,105.642917],
-    'Sân soccer': [10.420825,105.644397],
-    'Khu thí nghiệm': [10.420781,105.644899],
-    'Giảng đường A': [10.419691,105.643799],
-    'Thư viện': [10.421060,105.643770],
-    'Ký túc xá': [10.421669,105.643866],
-    'Hiệu bộ': [10.420409,105.642938],
-    'Nhà xe cổng B': [10.421197,105.643890],
-    'Nhà xe cổng C': [10.421073,105.642450],
-    'Trường mẫu giáo': [10.418921,105.644955],
-    'Hồ bơi': [10.422321,105.640886]
-  };
+    const E = [
+      ['Cổng C','Nhà xe cổng C'], ['Cổng C','Tòa C1'], ['Tòa C1','Tòa C2'],
+      ['Nhà xe cổng C','Tòa B2'], ['Tòa B2','Tòa B1'], ['Tòa B2','Tòa B3'], ['Tòa B3','Tòa B4'], ['Tòa B4','Tòa B5'],
+      ['Cổng B','Tòa B1'], ['Cổng B','Hiệu bộ'], ['Hiệu bộ','Tòa B1'],
+      ['Tòa B1','Tòa A1'], ['Tòa A1','Tòa H1'], ['Tòa H1','Thư viện'],
+      ['Thư viện','Tòa B4'], ['Thư viện','Nhà xe cổng B'], ['Tòa B4','Tòa B5'], ['Nhà xe cổng B','Tòa B3'],
+      ['Tòa A1','Tòa A4'], ['Tòa A4','Giảng đường A'], ['Giảng đư��ng A','Tòa A7'], ['Tòa A7','Tòa A9'],
+      ['Giảng đường A','Tòa H2'], ['Tòa H2','Tòa H3'], ['Tòa H2','Tòa A8'], ['Tòa A8','Tòa T1'], ['Tòa T1','Tòa T3'],
+      ['Tòa A8','Tòa A9'], ['Tòa T3','Trường mẫu giáo'],
+      ['Tòa B4','Sân basketball'], ['Sân basketball','Tòa B5'], ['Sân basketball','Sân pickleball'],
+      ['Ký túc xá','Tòa B5'], ['Ký túc xá','Thư viện'],
+      ['Tòa T1','Khu thí nghiệm'], ['Khu thí nghiệm','Sân soccer']
+    ];
 
-  const waypoints = {
-    'WP_CongC_B1': [10.42105, 105.64220],
-    'WP_CongB_B1': [10.42055, 105.64255],
-    'WP_B1_B2': [10.42085, 105.64270],
-    'WP_B2_B3': [10.42100, 105.64295],
-    'WP_B3_B4': [10.42120, 105.64315],
-    'WP_B4_B5': [10.42140, 105.64335],
-    'WP_B5_ThuVien': [10.42125, 105.64365],
-    'WP_A1_A4': [10.42035, 105.64370],
-    'WP_A4_A7': [10.41970, 105.64390],
-    'WP_A7_A8': [10.41920, 105.64435],
-    'WP_A8_A9': [10.41910, 105.64460],
-    'WP_H1_H2': [10.42010, 105.64410],
-    'WP_H2_H3': [10.41990, 105.64445],
-    'WP_T1_T3': [10.41960, 105.64495],
-    'WP_San_Basket_Soccer': [10.42120, 105.64400],
-    'WP_Soccer_ThiNghiem': [10.42080, 105.64465],
-    'WP_C1_C2': [10.42195, 105.64170],
-    'WP_ThuVien_KTX': [10.42135, 105.64380],
-    'WP_HieuBoi_CongB': [10.42060, 105.64275]
-  };
-
-  for (const [nm,ll] of Object.entries({...poiTable, ...waypoints})) {
-    nodes.set(nm, {lat: ll[0], lng: ll[1]});
-  }
-
-  const E = [
-    ['Cổng C','WP_CongC_B1'],
-    ['WP_CongC_B1','Tòa B1'],
-    ['WP_CongC_B1','Nhà xe cổng C'],
-    ['Cổng B','WP_CongB_B1'],
-    ['WP_CongB_B1','Tòa B1'],
-    ['WP_CongB_B1','Hiệu bộ'],
-    ['WP_CongB_B1','Nhà xe cổng B'],
-    ['Tòa B1','WP_B1_B2'],
-    ['Tòa B2','WP_B1_B2'],
-    ['Tòa B2','WP_B2_B3'],
-    ['Tòa B3','WP_B2_B3'],
-    ['Tòa B3','WP_B3_B4'],
-    ['Tòa B4','WP_B3_B4'],
-    ['Tòa B4','WP_B4_B5'],
-    ['Tòa B5','WP_B4_B5'],
-    ['Tòa B5','WP_B5_ThuVien'],
-    ['Thư viện','WP_B5_ThuVien'],
-    ['WP_B5_ThuVien','WP_ThuVien_KTX'],
-    ['Ký túc xá','WP_ThuVien_KTX'],
-    ['Tòa A1','WP_A1_A4'],
-    ['Tòa A4','WP_A1_A4'],
-    ['Tòa A4','WP_A4_A7'],
-    ['Tòa A7','WP_A4_A7'],
-    ['Tòa A7','WP_A7_A8'],
-    ['Tòa A8','WP_A7_A8'],
-    ['Tòa A8','WP_A8_A9'],
-    ['Tòa A9','WP_A8_A9'],
-    ['Giảng đường A','WP_A4_A7'],
-    ['Tòa H1','WP_H1_H2'],
-    ['Tòa H2','WP_H1_H2'],
-    ['Tòa H2','WP_H2_H3'],
-    ['Tòa H3','WP_H2_H3'],
-    ['Tòa T1','WP_T1_T3'],
-    ['Tòa T3','WP_T1_T3'],
-    ['Tòa C1','WP_C1_C2'],
-    ['Tòa C2','WP_C1_C2'],
-    ['Sân basketball','WP_San_Basket_Soccer'],
-    ['Sân soccer','WP_San_Basket_Soccer'],
-    ['Sân soccer','WP_Soccer_ThiNghiem'],
-    ['Khu thí nghiệm','WP_Soccer_ThiNghiem'],
-    ['Nhà thi đấu đa năng','Sân pickleball'],
-    ['Sân pickleball','Sân basketball'],
-    ['Hiệu bộ','WP_HieuBoi_CongB'],
-    ['Cổng B','WP_HieuBoi_CongB'],
-    ['Trường mẫu giáo','Tòa A9'],
-    ['Hồ bơi','Tòa C2']
-  ];
-
-  const adj = new Map();
-  for (const [a,b] of E){
-    if(!nodes.has(a) || !nodes.has(b)) continue;
-    if (!adj.has(a)) adj.set(a, []);
-    if (!adj.has(b)) adj.set(b, []);
-    adj.get(a).push(b);
-    adj.get(b).push(a);
-  }
-
-  return { nodes, adj };
-}
-
-function drawCampusGraph(map, campus) {
-  for (const [name, pos] of campus.nodes) {
-    L.circleMarker([pos.lat, pos.lng], {
-      radius: 4,
-      color: 'blue',
-      fillColor: 'cyan',
-      fillOpacity: 0.7
-    })
-    .bindPopup(name)
-    .addTo(map);
-  }
-  for (const [a, neighbors] of campus.adj) {
-    for (const b of neighbors) {
-      const pa = campus.nodes.get(a);
-      const pb = campus.nodes.get(b);
-      if (!pa || !pb) continue;
-      L.polyline([[pa.lat, pa.lng],[pb.lat, pb.lng]], {
-        color: 'red', weight: 2, opacity: 0.6
-      }).addTo(map);
+    const adj = new Map();
+    for (const [a,b] of E){
+      if(!nodes.has(a) || !nodes.has(b)) continue;
+      const A = nodes.get(a), B = nodes.get(b);
+      const w = haversineMeters(A.lat, A.lng, B.lat, B.lng);
+      if (!adj.has(a)) adj.set(a, []);
+      if (!adj.has(b)) adj.set(b, []);
+      adj.get(a).push({to:b, weight:w});
+      adj.get(b).push({to:a, weight:w});
     }
+    return { nodes, adj };
   }
-}
 
   const CAMPUS_ROUTER_NEAR_NODE_M = 350; // khoảng cách coi là "gần" mạng lưới
 
@@ -1354,8 +1268,6 @@ function drawCampusGraph(map, campus) {
 
   // Ngưỡng snap lên tuyến tím (nới lỏng để ưu tiên tuyến nội bộ)
   const MANUAL_SNAP_THRESHOLD_M = 800;
-  const BEELINE_MAX_GRID_CELLS = 90000;
-  const BEELINE_CAMPUS_RADIUS_M = 700;
 
   // Xây coords theo kiểu: [start] + [đoạn tuyến tím giữa 2 nút gần nhất] + [end]
   function buildSnappedManualRouteCoords(s, e){
@@ -1431,29 +1343,15 @@ function drawCampusGraph(map, campus) {
     const s = await resolveInputCoords(startEl);
     const e = await resolveInputCoords(endEl);
 
-    // Ưu tiên 0: Tuyến nội bộ khuôn viên (màu tím)
-    // - Khi bật định vị (watch) và một trong hai điểm gần khuôn viên -> CƯỠNG BẮT dùng tuyến nội bộ
-    // - Hoặc khi cả hai điểm đều gần khuôn viên
-    const sNear = isNearCampus(s[0], s[1], 1500);
-    const eNear = isNearCampus(e[0], e[1], 1500);
-    const forceCampus = (userWatchId !== null && (sNear || eNear)) || (sNear && eNear);
-    if (forceCampus) {
-      const candidates = [
-        tryWalkwayRoute,
-        tryCampusShortestRoute,
-        (a, b) => buildSnappedManualRouteCoords(a, b),
-        tryBeelineGridRoute // để cuối cùng vì tính toán nặng
-      ];
-      for (const fn of candidates) {
-        try {
-          const coords = fn(s, e);
-          if (Array.isArray(coords) && coords.length >= 2) {
-            drawManualRouteCoords(coords);
-            return;
-          }
-        } catch {}
+    // Ưu tiên 0: Beeline A* n���i bộ khuôn viên (chỉ khi cả hai điểm gần khuôn viên)
+    const campusCenter = { lat: 10.4209, lng: 105.6439 };
+    const nearCampus = distanceMeters({lat:s[0],lng:s[1]}, campusCenter) < 1200 && distanceMeters({lat:e[0],lng:e[1]}, campusCenter) < 1200;
+    if (nearCampus) {
+      const gridCoords = tryBeelineGridRoute(s, e);
+      if (Array.isArray(gridCoords) && gridCoords.length >= 2) {
+        drawManualRouteCoords(gridCoords);
+        return;
       }
-      // nếu không tìm được tuyến nội bộ thì tiếp tục dùng OSRM ở bên dưới
     }
 
     
@@ -1634,131 +1532,3 @@ function drawCampusGraph(map, campus) {
 })();
 
 });
-
-
-
-function drawRoute(map, campus, path) {
-  if (!path || path.length === 0) return;
-
-  const latlngs = path.map(name => {
-    const p = campus.nodes.get(name);
-    return [p.lat, p.lng];
-  });
-
-  L.polyline(latlngs, {
-    color: 'purple',
-    weight: 4,
-    opacity: 0.9
-  }).addTo(map);
-}
-
-
-
-
-// ================== TÍNH KHOẢNG CÁCH (Haversine) ==================
-function haversineDistance(a, b) {
-  if (!a || !b) return Infinity;
-  const R = 6371000; // Earth radius in meters
-  const toRad = deg => deg * Math.PI / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const lat1 = toRad(a.lat);
-  const lat2 = toRad(b.lat);
-
-  const h = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1) * Math.cos(lat2) *
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-
-// ================== DIJKSTRA TÌM ĐƯỜNG NGẮN NHẤT (Tối ưu) ==================
-function findShortestPath(campus, start, end) {
-  if (!campus || !campus.nodes || !campus.adj) return null;
-  if (!campus.nodes.has(start) || !campus.nodes.has(end)) return null;
-  if (start === end) return [start];
-
-  // Min-heap priority queue (binary heap) for efficiency
-  class MinHeap {
-    constructor() { this.items = []; }
-    push(k, v) { this.items.push({k,v}); this._siftUp(this.items.length-1); }
-    pop() { if (!this.items.length) return null; const top = this.items[0]; const last = this.items.pop(); if (this.items.length) { this.items[0] = last; this._siftDown(0); } return top; }
-    _siftUp(i){ while(i>0){ const p=(i-1)>>1; if (this.items[p].v <= this.items[i].v) break; [this.items[p], this.items[i]] = [this.items[i], this.items[p]]; i=p; } }
-    _siftDown(i){ const n=this.items.length; while(true){ let l=2*i+1, r=l+1, smallest=i; if(l<n && this.items[l].v < this.items[smallest].v) smallest=l; if(r<n && this.items[r].v < this.items[smallest].v) smallest=r; if(smallest===i) break; [this.items[smallest], this.items[i]] = [this.items[i], this.items[smallest]]; i=smallest; } }
-    isEmpty(){ return this.items.length===0; }
-  }
-
-  const dist = new Map();
-  const prev = new Map();
-  const visited = new Set();
-  const pq = new MinHeap();
-
-  for (const k of campus.nodes.keys()) dist.set(k, Infinity);
-  dist.set(start, 0);
-  pq.push(start, 0);
-
-  while (!pq.isEmpty()) {
-    const {k: u, v: dcur} = pq.pop();
-    if (visited.has(u)) continue;
-    visited.add(u);
-    if (u === end) break;
-
-    const neighbors = campus.adj.get(u) || [];
-    for (const v of neighbors) {
-      if (visited.has(v)) continue;
-      const alt = dist.get(u) + haversineDistance(campus.nodes.get(u), campus.nodes.get(v));
-      if (alt < dist.get(v)) {
-        dist.set(v, alt);
-        prev.set(v, u);
-        pq.push(v, alt);
-      }
-    }
-  }
-
-  if (!prev.has(end) && start !== end) return null;
-  const path = [];
-  let cur = end;
-  while (cur !== undefined) {
-    path.unshift(cur);
-    cur = prev.get(cur);
-    if (path.length > campus.nodes.size + 5) break; // safety
-  }
-  return (path[0] === start) ? path : null;
-}
-
-// ================== HỖ TRỢ: TỰ ĐỘNG VẼ VÀ QUẢN LÝ LAYER ROUTE ==================
-const __campusRouteLayers = { baseEdges: [], lastRoute: null };
-
-function clearLastRoute() {
-  try {
-    if (__campusRouteLayers.lastRoute) {
-      if (Array.isArray(__campusRouteLayers.lastRoute)) {
-        __campusRouteLayers.lastRoute.forEach(l => { if (l && map && map.hasLayer && map.hasLayer(l)) map.removeLayer(l); });
-      } else {
-        if (map && map.hasLayer && map.hasLayer(__campusRouteLayers.lastRoute)) map.removeLayer(__campusRouteLayers.lastRoute);
-      }
-    }
-  } catch (e) {}
-  __campusRouteLayers.lastRoute = null;
-}
-
-// drawRoute updated to clear previous route
-function drawRoute(map, campus, path, opts = {}) {
-  clearLastRoute();
-  if (!path || path.length === 0) return;
-  const latlngs = path.map(name => {
-    const p = campus.nodes.get(name);
-    return [p.lat, p.lng];
-  });
-  const poly = L.polyline(latlngs, {
-    color: opts.color || 'purple',
-    weight: opts.weight || 4,
-    opacity: typeof opts.opacity === 'number' ? opts.opacity : 0.95,
-    lineJoin: 'round'
-  }).addTo(map);
-  __campusRouteLayers.lastRoute = poly;
-  return poly;
-}
-
-
-

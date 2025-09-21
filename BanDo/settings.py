@@ -21,6 +21,9 @@ EMAIL_HOST_USER = 'cuonghiqpqp147@gmail.com'
 EMAIL_HOST_PASSWORD = 'bzgqgeqpcoaitgre'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 CONTACT_TO_EMAIL = 'cuonghiqpqp147@gmail.com'
+CSRF_TRUSTED_ORIGINS = [
+    "https://mappdthu.onrender.com"
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',

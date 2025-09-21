@@ -1,0 +1,129 @@
+    {% load static %}
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Tìm đường đi trên bản đồ</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        
+        <!-- Font Awesome + Leaflet -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+        <link href="https://unpkg.com/leaflet/dist/leaflet.css" rel="stylesheet">
+
+        <link rel="icon" type="image/x-icon" href="{% static 'app/images/favicon.ico' %}">
+        <!-- CSS custom -->
+        <link rel="stylesheet" href="{% static 'app/css/styles.css' %}">
+    </head>
+    <body>
+        <div class="bo-cuc-chinh">
+            <!-- Sidebar mini -->
+            <nav class="sidebar">
+                <button class="sidebar-item" onclick="toggleForm()">
+                    <span class="sidebar-icon"><i class="fa-solid fa-route"></i></span>
+                    <span class="sidebar-label">Tìm</span>
+                </button>
+                <hr class="sidebar-divider">
+                    <button id="loc-btn" class="sidebar-item" onclick="getCurrentLocation()" aria-label="Vị trí">
+                    <span class="sidebar-icon"><i class="fa-solid fa-location-crosshairs"></i></span>
+                    <span class="sidebar-label">Vị trí</span>
+                    </button>
+                <div class="sidebar-item" id="contact-btn">
+                    <i class="fa-solid fa-envelope sidebar-icon"></i>
+                    <span class="sidebar-label">Liên hệ</span>
+                </div>
+            </nav>
+
+            <!-- Map -->
+            <div id="map"></div>
+            <!-- Route info panel -->
+            <div id="route-info" aria-live="polite"></div>
+        </div>
+
+        <!-- Overlay form tìm đường -->
+        <div id="form-overlay" class="overlay-scrim">
+        <div class="hop-thong-tin">
+            <h1 class="tieu-de"><i class="fa-solid fa-location-dot"></i> Tìm đường đi</h1>
+            <form class="form-nhap" onsubmit="return false;">
+            <label for="start">Điểm xuất phát:</label>
+            <input type="text" id="start" placeholder="Nhập địa chỉ hoặc tọa độ" required>
+            <label for="end">Điểm đến:</label>
+            <input type="text" id="end" placeholder="Nhập địa chỉ hoặc tọa độ" required>
+            <div class="button-row">
+                <button type="button" onclick="findRoute()">
+                <i class="fa-solid fa-paper-plane"></i> Gửi
+                </button>
+                <button type="button" class="btn-secondary" onclick="resetMap()">
+                <i class="fa-solid fa-eraser"></i> Reset
+                </button>
+                <button type="button" class="btn-danger" onclick="toggleForm()">
+                <i class="fa-solid fa-xmark"></i> Đóng
+                </button>
+            </div>
+            </form>
+        </div>
+        </div>
+        <!-- Overlay form liên hệ -->
+        <!-- Nền mờ -->
+        <div id="contact-overlay-scrim"></div>
+
+        <!-- Card popup -->
+        <div id="contact-overlay-card">
+        <form id="contact-form" class="form-nhap" onsubmit="return false;">
+            <label for="cf-name">Họ tên</label>
+            <input id="cf-name" type="text" placeholder="Nguyễn Văn A" required>
+
+            <label for="cf-email">Email</label>
+            <input id="cf-email" type="email" placeholder="email@example.com">
+
+            <label for="cf-phone">Số điện thoại</label>
+            <input id="cf-phone" type="tel" placeholder="0123 456 789">
+
+            <label for="cf-message">Nội dung</label>
+            <textarea id="cf-message" placeholder="Nhập nội dung..." required></textarea>
+
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;">
+                <button type="button" id="contact-cancel" class="btn-secondary">Hủy</button>
+                <button type="submit" class="btn-success"><i class="fa-solid fa-paper-plane"></i> Gửi</button>
+            </div>
+        </form>
+        </div>
+
+        <!-- Leaflet + JS custom -->
+        <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+        <script src="{% static 'app/js/xuli.js' %}"></script>
+
+        <script>
+        // Script tìm đường
+        function toggleForm() {
+            const formOverlay = document.getElementById("form-overlay");
+            if (formOverlay.style.display === "flex") {
+            formOverlay.style.display = "none";
+            } else {
+            formOverlay.style.display = "flex";
+            }
+        }
+        </script>
+        <!-- Script liên hệ -->
+            <script>
+        // Mở overlay khi bấm "Liên hệ"
+        document.getElementById("contact-btn").addEventListener("click", () => {
+        document.getElementById("contact-overlay-scrim").style.display = "block";
+        document.getElementById("contact-overlay-card").style.display = "block";
+        });
+
+        // Đóng khi bấm Hủy
+        document.getElementById("contact-cancel").addEventListener("click", () => {
+        document.getElementById("contact-overlay-scrim").style.display = "none";
+        document.getElementById("contact-overlay-card").style.display = "none";
+        });
+
+        // Đóng khi click nền mờ
+        document.getElementById("contact-overlay-scrim").addEventListener("click", () => {
+        document.getElementById("contact-overlay-scrim").style.display = "none";
+        document.getElementById("contact-overlay-card").style.display = "none";
+        });
+        </script>
+        
+    </body>
+    </html>

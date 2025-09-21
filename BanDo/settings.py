@@ -10,7 +10,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret")
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
 # ALLOWED_HOSTS (tạm mở rộng hết, deploy thật thì chỉnh lại domain)
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["mappdthu.onrender.com", "127.0.0.1", "localhost"]
+
 
 # Email (nếu cần gửi mail thật)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'

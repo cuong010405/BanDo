@@ -5,7 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import EmailMessage
 from django.conf import settings
 import json
-
+import traceback
 # Create your views here.
 def GiaoDienChinh(request):
     return render(request, 'app/GiaoDienChinh.html')
@@ -50,5 +50,7 @@ def api_contact(request):
         )
         mail.send(fail_silently=False)
         return JsonResponse({'ok': True})
-    except Exception:
-        return JsonResponse({'ok': False, 'error': 'Không gửi được email. Kiểm tra cấu hình SMTP.'}, status=500)
+    except Exception as e:
+        print("❌ Lỗi gửi mail:", e)
+        traceback.print_exc()
+        return JsonResponse({'ok': False, 'error': str(e)}, status=500)

@@ -1490,14 +1490,25 @@ function attachEventHandlers() {
     if (!name || !msg) { showCenterNotice('Vui lòng nhập Họ tên và Nội dung.', 'warn'); return; }
 
     setContactLoading(true);
-    // Gửi dữ liệu tới server Django
-    fetch('https://mappdthu.onrender.com/api/contact', {
+      fetch('https://mappdthu.onrender.com/api/contact', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      headers: {
+        'Content-Type': 'application/json', 
+        'X-CSRFToken': getCookie('csrftoken') 
+      },
       body: JSON.stringify({ name, email, phone, message: msg })
     })
-    .then(res => res.json())
-    .then(data => {
+    .then(res => res.text())
+    .then(text => {
+      console.log("Phản hồi server:", text);
+
+      let data = {};
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.warn("Không phải JSON:", text);
+      }
+
       if (data.ok) {
         showCenterNotice('Gửi thành công!', 'success');
         try {
@@ -1510,9 +1521,14 @@ function attachEventHandlers() {
       } else {
         showCenterNotice('Gửi thất bại, vui lòng thử lại.', 'error');
       }
+
       setContactLoading(false);
     })
-    .catch(() => { setContactLoading(false); showCenterNotice('Có lỗi khi gửi.', 'error'); });
+    .catch(err => { 
+      console.error("Fetch error:", err);
+      setContactLoading(false); 
+      showCenterNotice('Có lỗi khi gửi.', 'error'); 
+    });
   });
 
   // Hàm lấy CSRF token

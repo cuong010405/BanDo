@@ -1491,7 +1491,7 @@ function attachEventHandlers() {
 
     setContactLoading(true);
     // Gửi dữ liệu tới server Django
-    fetch('/api/contact', {
+    fetch('https://mappdthu.onrender.com/api/contact', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
       body: JSON.stringify({ name, email, phone, message: msg })

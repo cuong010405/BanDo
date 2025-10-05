@@ -28,10 +28,7 @@
                     <span class="sidebar-icon"><i class="fa-solid fa-location-crosshairs"></i></span>
                     <span class="sidebar-label">Vị trí</span>
                     </button>
-                <div class="sidebar-item" id="contact-btn">
-                    <i class="fa-solid fa-envelope sidebar-icon"></i>
-                    <span class="sidebar-label">Liên hệ</span>
-                </div>
+
             </nav>
 
             <!-- Map -->
@@ -66,28 +63,6 @@
         <!-- Overlay form liên hệ -->
         <!-- Nền mờ -->
         <div id="contact-overlay-scrim"></div>
-
-        <!-- Card popup -->
-        <div id="contact-overlay-card">
-        <form id="contact-form" class="form-nhap" onsubmit="return false;">
-            <label for="cf-name">Họ tên</label>
-            <input id="cf-name" type="text" placeholder="Nguyễn Văn A" required>
-
-            <label for="cf-email">Email</label>
-            <input id="cf-email" type="email" placeholder="email@example.com">
-
-            <label for="cf-phone">Số điện thoại</label>
-            <input id="cf-phone" type="tel" placeholder="0123 456 789">
-
-            <label for="cf-message">Nội dung</label>
-            <textarea id="cf-message" placeholder="Nhập nội dung..." required></textarea>
-
-            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:12px;">
-                <button type="button" id="contact-cancel" class="btn-secondary">Hủy</button>
-                <button type="submit" class="btn-success"><i class="fa-solid fa-paper-plane"></i> Gửi</button>
-            </div>
-        </form>
-        </div>
 
         <!-- Leaflet + JS custom -->
         <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>

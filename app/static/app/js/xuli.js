@@ -78,13 +78,12 @@ document.addEventListener('DOMContentLoaded', function () {
   maxZoom: 20
 }).addTo(map);
 
-    // ...existing code...
-    // ...existing code...
+
   
 
   // --- ĐƯỜNG MINH HỌA (CUSTOM VISUAL PATHS) ---
   // Thay các điểm sau cho khớp "đường đen" trên ảnh; mỗi phần là một polyline riêng.
- // ...existing code...
+
   // --- ĐƯỜNG MINH HỌA (CUSTOM VISUAL PATHS) ---
   // Các polyline ví dụ mô phỏng đường đen trên map bạn gửi.
   // Mỗi phần là 1 đoạn đường; chỉnh tọa độ nếu cần để khớp chính xác.
@@ -103,11 +102,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
       
     ],
-    // 3) đoạn từ cổng b quẹo phải xuống gd 1 -  T2
+    // 3) đoạn từ cổng b quẹo phải xuống gd 1 -  T2 - A8
     [
       [10.420418, 105.642579],
       [10.419249, 105.643657],
-      [10.419340, 105.644594]
+      [10.419340, 105.644594],
+      [10.419274, 105.644832]
     ],
     // 4) hiệu bộ
     [
@@ -120,8 +120,38 @@ document.addEventListener('DOMContentLoaded', function () {
       [10.420988, 105.641884],
       [10.421120, 105.642065],
       [10.421882, 105.641390]
-    ]
+    ],
+    // từ gd 1 qua tòa h3
+    [
+      [10.420024, 105.643593],
+      [10.420027, 105.644388],
+      [10.420142, 105.644641]
+      
+    ],
+    // từ a4 qua h2
+    [
+      [10.420029, 105.644001],
+      [10.419290, 105.644043]
+    ],
+    // từ gd 1 qua  a9
+    [
+      [10.419661, 105.643571],
+      [10.419290, 105.644043],
+      [10.418984, 105.644384]
+    ],
+    // qua a7
+    [
+      [10.419290, 105.644043],
+      [10.419032, 105.643874]
+    ],
+    // A9 qua A3-A2-A1
+    [
+      [10.419340, 105.644594],
+      [10.419760, 105.644797],
+      [10.419530, 105.645060],
+      [10.419185, 105.645060]
 
+    ]
   ];
 
   // Layer riêng cho đường minh họa (để dễ bật/tắt). Vẽ 2 lớp: nền đen dày + vạch trắng mảnh ở giữa.
@@ -133,9 +163,9 @@ document.addEventListener('DOMContentLoaded', function () {
     customVisualLayer = L.layerGroup();
     for (const seg of CUSTOM_VISUAL_PATHS) {
       // nền đường (đen, dày)
-      const base = L.polyline(seg, { color: '#000000', weight: 8, opacity: 0.95, interactive: false, lineJoin: 'round' });
+      const base = L.polyline(seg, { color: '#000000', weight: 10, opacity: 0.95, interactive: false, lineJoin: 'round' });
       // vạch giữa (mảnh, trắng đứt)
-      const center = L.polyline(seg, { color: '#ffffff', weight: 2, opacity: 0.95, dashArray: '10,8', interactive: false, lineCap: 'round' });
+      const center = L.polyline(seg, { color: '#ffffff', weight: 1, opacity: 0.95, dashArray: '10,8', interactive: false, lineCap: 'round' });
       try { base.bringToBack(); } catch {}
       try { center.bringToFront(); } catch {}
       customVisualLayer.addLayer(base);
@@ -167,9 +197,281 @@ document.addEventListener('DOMContentLoaded', function () {
   // Vẽ ngay (hàm drawCampusOnlyPaths có thể gọi lại)
   try { drawCustomVisualPaths(); } catch(e) {}
   // --- KẾT THÚC đường minh họa ---
+
+// --- VẼ SÂN VẬN ĐỘNG (polygon mô phỏng) ---
+// Tọa độ polygon mẫu bám quanh Sân soccer (chỉnh nếu cần)
+const STADIUM_POLY = [
+  [10.421318, 105.644350],
+  [10.421323, 105.644850],
+  [10.420641, 105.644869],
+  [10.420644, 105.644361]
+
+
+];
+
+let stadiumLayer = null;
+let stadiumVisible = true;
+
+function buildStadiumLayer() {
+  if (stadiumLayer) return stadiumLayer;
+  stadiumLayer = L.layerGroup();
+  // nền cỏ xanh + viền
+  const poly = L.polygon(STADIUM_POLY, {
+    color: '#0f9d58',
+    weight: 2,
+    opacity: 0.95,
+    fillColor: '#34d399',
+    fillOpacity: 0.85,
+    lineJoin: 'round'
+  });
+  // hàng kẻ sân (song song) — vài đường để giống sân vận động
+  const stripes = [];
+  for (let i = 0; i < STADIUM_POLY.length - 1; i++) {
+    const a = STADIUM_POLY[i];
+    const b = STADIUM_POLY[(i+1) % STADIUM_POLY.length];
+    const mx = (a[0] + b[0]) / 2;
+    const my = (a[1] + b[1]) / 2;
+    stripes.push([[mx, my], [(mx + a[0]) / 2, (my + a[1]) / 2]]);
+  }
+  stripes.forEach(s => {
+    const line = L.polyline(s, { color: 'rgba(255,255,255,0.7)', weight: 1.2, dashArray: '4,6', interactive: false });
+    stadiumLayer.addLayer(line);
+  });
+  stadiumLayer.addLayer(poly);
+  // label cố định
+  const labelIcon = L.divIcon({
+    className: 'stadium-label',
+   
+    iconSize: [120, 28],
+    iconAnchor: [60, -10]
+  });
+  const centroid = poly.getBounds().getCenter();
+  const label = L.marker([centroid.lat, centroid.lng], { icon: labelIcon, interactive: false });
+  stadiumLayer.addLayer(label);
+  return stadiumLayer;
+}
+
+function drawStadium() {
+  if (!map) { setTimeout(drawStadium, 200); return; }
+  const layer = buildStadiumLayer();
+  if (!map.hasLayer(layer) && stadiumVisible) map.addLayer(layer);
+}
+
+function clearStadium() {
+  try { if (stadiumLayer && map && map.hasLayer(stadiumLayer)) map.removeLayer(stadiumLayer); } catch {}
+  stadiumLayer = null;
+}
+
+window.drawStadium = drawStadium;
+window.clearStadium = clearStadium;
+window.toggleStadium = function() { stadiumVisible = !stadiumVisible; if (stadiumVisible) drawStadium(); else clearStadium(); };
+
+// Vẽ tự động khi load map
+try { drawStadium(); } catch (e) {}
+// --- KẾT THÚC: sân vận động ---
+
+// --- VẼ HỒ BƠI (polygon mô phỏng) ---
+const POOL_POLY = [
+  [10.422301, 105.640676],
+  [10.422461, 105.640868],
+  [10.422192, 105.641138],
+  [10.422042, 105.640920]
+];
+
+let poolLayer = null;
+let poolVisible = true;
+
+function buildPoolLayer() {
+  if (poolLayer) return poolLayer;
+  poolLayer = L.layerGroup();
+  // nền nước xanh nhạt + viền
+  const poly = L.polygon(POOL_POLY, {
+    color: '#0ea5e9',
+    weight: 2,
+    opacity: 0.95,
+    fillColor: '#60a5fa',
+    fillOpacity: 0.85,
+    lineJoin: 'round'
+  });
+  poolLayer.addLayer(poly);
+
+  // vẽ vài đường cong mô phỏng sóng (bằng các polyline mảnh màu trắng mờ)
+  const midpoints = [
+    [[10.42248,105.64072],[10.42222,105.64072]],
+    [[10.42248,105.64086],[10.42222,105.64086]],
+    [[10.42248,105.64100],[10.42222,105.64100]]
+  ];
+  midpoints.forEach(mp => {
+    const wave = L.polyline(mp, { color: 'rgba(255,255,255,0.85)', weight: 1.2, dashArray: '4,6', interactive: false });
+    poolLayer.addLayer(wave);
+  });
+
+  // label hồ bơi
+  const labelIcon = L.divIcon({
+    className: 'pool-label',
+    html: `<div style="background:rgba(3,105,161,0.9);color:#fff;padding:6px 10px;border-radius:8px;font-weight:700">Hồ bơi</div>`,
+    iconSize: [90, 28],
+    iconAnchor: [45, -10]
+  });
+  const centroid = poly.getBounds().getCenter();
+  const label = L.marker([centroid.lat, centroid.lng], { icon: labelIcon, interactive: false });
+  poolLayer.addLayer(label);
+
+  return poolLayer;
+}
+
+function drawPool() {
+  if (!map) { setTimeout(drawPool, 200); return; }
+  const layer = buildPoolLayer();
+  if (!map.hasLayer(layer) && poolVisible) map.addLayer(layer);
+}
+
+function clearPool() {
+  try { if (poolLayer && map && map.hasLayer(poolLayer)) map.removeLayer(poolLayer); } catch {}
+  poolLayer = null;
+}
+
+window.drawPool = drawPool;
+window.clearPool = clearPool;
+window.togglePool = function() { poolVisible = !poolVisible; if (poolVisible) drawPool(); else clearPool(); };
+
+// Vẽ tự động khi load map
+try { drawPool(); } catch (e) {}
+// --- KẾT THÚC: hồ bơi ---
+
 // ...existing code...
 
-      
+  // --- ĐƯỜNG TRẮNG RIÊNG (dùng cho vẽ chỗ xen kẽ) ---
+  // Mảng chứa các đoạn đường trắng: mỗi phần là một mảng [ [lat,lng], ... ]
+  let CUSTOM_WHITE_PATHS = [
+    [10.421097, 105.642078],
+    [10.420994, 105.642183]
+
+  ];
+
+  // Layer & trạng thái
+  let customWhiteLayer = null;
+  let customWhiteVisible = true;
+
+  // Draft khi vẽ tương tác
+  let _draftWhite = null;
+  let _draftLine = null;
+  let _draftMarkers = [];
+  let _isDrawingWhite = false;
+
+  function buildCustomWhiteLayer() {
+    if (customWhiteLayer) return customWhiteLayer;
+    customWhiteLayer = L.layerGroup();
+    for (const seg of CUSTOM_WHITE_PATHS) {
+      if (!Array.isArray(seg) || seg.length < 2) continue;
+      // outline nhẹ để nổi trên nền sáng
+      const outline = L.polyline(seg, { color: 'rgba(0,0,0,0.12)', weight: 6, opacity: 0.6, interactive: false, lineJoin: 'round' });
+      const white = L.polyline(seg, { color: '#ffffff', weight: 3.2, opacity: 0.98, interactive: false, lineJoin: 'round' });
+      customWhiteLayer.addLayer(outline);
+      customWhiteLayer.addLayer(white);
+    }
+    return customWhiteLayer;
+  }
+
+  function drawCustomWhitePaths() {
+    if (!map) { setTimeout(drawCustomWhitePaths, 200); return; }
+    const layer = buildCustomWhiteLayer();
+    if (!map.hasLayer(layer) && customWhiteVisible) map.addLayer(layer);
+  }
+
+  function clearCustomWhitePaths() {
+    try { if (customWhiteLayer && map && map.hasLayer(customWhiteLayer)) map.removeLayer(customWhiteLayer); } catch {}
+    customWhiteLayer = null;
+  }
+
+  // --- Interactive drawing helpers (click để thêm điểm, dblclick hoặc Enter để hoàn tất, Esc hủy) ---
+  function _createDraftMarker(latlng) {
+    const m = L.circleMarker(latlng, { radius: 4, color: '#000', weight: 1, fillColor: '#fff', fillOpacity: 1 }).addTo(map);
+    _draftMarkers.push(m);
+  }
+  function _updateDraftLine() {
+    if (_draftLine) removeLayerIfExists(_draftLine);
+    if (!_draftWhite || _draftWhite.length < 2) return;
+    _draftLine = L.polyline(_draftWhite, { color: '#ffffff', weight: 3.2, opacity: 0.98, interactive: false }).addTo(map);
+  }
+
+  function startWhitePathDraw() {
+    if (_isDrawingWhite) return;
+    _isDrawingWhite = true;
+    _draftWhite = [];
+    _draftMarkers = [];
+    if (map) {
+      map.getContainer().style.cursor = 'crosshair';
+      map.on('click', _onMapClickWhileDrawingWhite);
+      map.on('dblclick', _onMapDblClickWhileDrawingWhite);
+    }
+    showCenterNotice('Vẽ đường trắng: click để thêm điểm; double-click hoặc Enter để hoàn tất; Esc để hủy.', 'success');
+  }
+
+  function _onMapClickWhileDrawingWhite(e) {
+    if (!_isDrawingWhite) return;
+    const p = [parseFloat(e.latlng.lat.toFixed(6)), parseFloat(e.latlng.lng.toFixed(6))];
+    _draftWhite.push(p);
+    _createDraftMarker(p);
+    _updateDraftLine();
+  }
+
+  function _onMapDblClickWhileDrawingWhite() { finishWhitePathDraw(); }
+
+  function finishWhitePathDraw() {
+    if (!_isDrawingWhite) return;
+    if (Array.isArray(_draftWhite) && _draftWhite.length >= 2) {
+      CUSTOM_WHITE_PATHS.push(_draftWhite.slice());
+      clearCustomWhitePaths();
+      drawCustomWhitePaths();
+      showCenterNotice('Đã lưu đường trắng.', 'success');
+    } else {
+      showCenterNotice('Đường quá ngắn — cần ít nhất 2 điểm.', 'error');
+    }
+    _stopWhiteDrawingCleanup();
+  }
+
+  function cancelWhitePathDraw() {
+    if (!_isDrawingWhite) return;
+    _stopWhiteDrawingCleanup();
+    showCenterNotice('Đã hủy vẽ đường trắng.', 'error');
+  }
+
+  function _stopWhiteDrawingCleanup() {
+    _isDrawingWhite = false;
+    if (map) {
+      map.off('click', _onMapClickWhileDrawingWhite);
+      map.off('dblclick', _onMapDblClickWhileDrawingWhite);
+      map.getContainer().style.cursor = '';
+    }
+    try { if (_draftLine) removeLayerIfExists(_draftLine); } catch {}
+    _draftLine = null;
+    for (const m of _draftMarkers) try { removeLayerIfExists(m); } catch {}
+    _draftMarkers = [];
+    _draftWhite = null;
+  }
+
+  // Runtime API
+  window.startWhitePathDraw = startWhitePathDraw;
+  window.finishWhitePathDraw = finishWhitePathDraw;
+  window.cancelWhitePathDraw = cancelWhitePathDraw;
+  window.setCustomWhitePaths = function(arr) { CUSTOM_WHITE_PATHS = Array.isArray(arr) ? arr : CUSTOM_WHITE_PATHS; clearCustomWhitePaths(); drawCustomWhitePaths(); };
+  window.clearCustomWhitePaths = function(){ CUSTOM_WHITE_PATHS = []; clearCustomWhitePaths(); };
+  window.toggleCustomWhitePaths = function(){ customWhiteVisible = !customWhiteVisible; if (customWhiteVisible) drawCustomWhitePaths(); else clearCustomWhitePaths(); };
+  window.exportCustomWhitePaths = function(){ console.log(JSON.stringify(CUSTOM_WHITE_PATHS)); return CUSTOM_WHITE_PATHS; };
+
+  // keyboard: Enter to finish, Esc to cancel while drawing
+  document.addEventListener('keydown', (ev) => {
+    if (!_isDrawingWhite) return;
+    if (ev.key === 'Enter') { ev.preventDefault(); finishWhitePathDraw(); }
+    if (ev.key === 'Escape') { ev.preventDefault(); cancelWhitePathDraw(); }
+  });
+
+  // Tự vẽ nếu muốn lúc load
+  try { drawCustomWhitePaths(); } catch (e) {}
+
+  // ...existing code...
+
 
       initCampusPOIs();
       centerToCampus();
@@ -939,8 +1241,9 @@ function attachEventHandlers() {
           { id: 'buildingA8', name: 'Nhà A8', lat: 10.419274, lng: 105.644832, description: 'Nhà A8' },
           { id: 'buildingA9', name: 'Nhà A9', lat: 10.418984, lng: 105.644384, description: 'Nhà A9' },
 
-          { id: 'buildingT1', name: 'Nhà T1', lat: 10.419760, lng: 105.644797, description: 'Nhà T1' },
-          { id: 'buildingT3', name: 'Nhà T3', lat: 10.419385, lng: 105.645060, description: 'Nhà T3' },
+          { id: 'buildingT1', name: 'Nhà T3', lat: 10.419760, lng: 105.644797, description: 'Nhà T3' },
+          { id: 'buildingT2', name: 'Nhà T2', lat: 10.419530, lng: 105.645060, description: 'Nhà T2' },
+          { id: 'buildingT3', name: 'Nhà T1', lat: 10.419185, lng: 105.645060, description: 'Nhà T1' },
 
           { id: 'buildingH1', name: 'Nhà H1', lat: 10.420601, lng: 105.643611, description: 'Nhà H1' },
           { id: 'buildingH2', name: 'Nhà H2', lat: 10.419686, lng: 105.644293, description: 'Nhà H2' },
@@ -949,8 +1252,8 @@ function attachEventHandlers() {
           { id: 'sports hall',       name: 'Nhà thi đấu đa năng', lat: 10.421258, lng: 105.642284, description: 'Nhà thi đấu đa năng' },
           { id: 'pickleball court',  name: 'Sân pickleball',       lat: 10.421511, lng: 105.642616, description: 'Sân pickleball' },
           { id: 'basketball court',  name: 'Sân basketball',       lat: 10.421696, lng: 105.642917, description: 'Sân basketball' },
-          { id: 'soccer field',      name: 'Sân soccer',           lat: 10.420825, lng: 105.644397, description: 'Sân soccer' },
-          { id: 'experimental area', name: 'Khu thí nghiệm',       lat: 10.420781, lng: 105.644899, description: 'Khu thí nghiệm' },
+          { id: 'soccer field',      name: 'Sân soccer',           lat: 10.420978, lng: 105.644630, description: 'Sân soccer' },
+          { id: 'experimental area', name: 'Khu thí nghiệm',       lat: 10.420794, lng: 105.644998, description: 'Khu thí nghiệm' },
 
           { id: 'hall-a',   name: 'Giảng đường A',  lat: 10.419691, lng: 105.643799, description: 'Giảng đường lớn dành cho các lớp học tập trung.' },
           { id: 'library',  name: 'Thư viện',       lat: 10.421060, lng: 105.643770, description: 'Thư viện trường, mở cửa từ 7:30 - 20:00.' },
@@ -1566,93 +1869,10 @@ function attachEventHandlers() {
     }
     return el;
   }
-  function showCenterNotice(message, kind){
-    const host = ensureCenterNotice();
-    const box = document.getElementById('center-notice-box');
-    box.textContent = message || '';
-    if (kind === 'success') { box.style.borderColor = 'rgba(16,185,129,.45)'; box.style.background = 'linear-gradient(180deg,#0b1220,#0f172a)'; }
-    else if (kind === 'error') { box.style.borderColor = 'rgba(239,68,68,.45)'; box.style.background = 'linear-gradient(180deg,#0b1220,#111827)'; }
-    else { box.style.borderColor = 'rgba(234,179,8,.45)'; box.style.background = 'linear-gradient(180deg,#0b1220,#111827)'; }
-    host.style.display = 'block';
-    try { if (noticeTimer) clearTimeout(noticeTimer); } catch {}
-    noticeTimer = setTimeout(() => { host.style.display = 'none'; }, 2200);
-  }
+  
 
-  function open(){ if(scrim) scrim.style.display='block'; if(card) card.style.display='block'; }
-  function close(){ if(scrim) scrim.style.display='none'; if(card) card.style.display='none'; }
+  
 
-  if (openBtn) openBtn.addEventListener('click', open);
-  if (scrim) scrim.addEventListener('click', (e)=>{ if(e.target===scrim) close(); });
-  if (closeBtn) closeBtn.addEventListener('click', close);
-  if (cancelBtn) cancelBtn.addEventListener('click', close);
-  document.addEventListener('keydown', (e)=>{ if (scrim && scrim.style.display==='block' && e.key==='Escape') close(); });
-
-  const form = document.getElementById('contact-form');
-  if (form) form.addEventListener('submit', function(ev){
-    ev.preventDefault();
-    const name = document.getElementById('cf-name')?.value?.trim() || '';
-    const email = document.getElementById('cf-email')?.value?.trim() || '';
-    const phone = document.getElementById('cf-phone')?.value?.trim() || '';
-    const msg = document.getElementById('cf-message')?.value?.trim() || '';
-    if (!name || !msg) { showCenterNotice('Vui lòng nhập Họ tên và Nội dung.', 'warn'); return; }
-
-    setContactLoading(true);
-      fetch('https://mappdthu.onrender.com/api/contact', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json', 
-        'X-CSRFToken': getCookie('csrftoken') 
-      },
-      body: JSON.stringify({ name, email, phone, message: msg })
-    })
-    .then(res => res.text())
-    .then(text => {
-      console.log("Phản hồi server:", text);
-
-      let data = {};
-      try {
-        data = JSON.parse(text);
-      } catch (e) {
-        console.warn("Không phải JSON:", text);
-      }
-
-      if (data.ok) {
-        showCenterNotice('Gửi thành công!', 'success');
-        try {
-          document.getElementById('cf-name').value = '';
-          document.getElementById('cf-email').value = '';
-          document.getElementById('cf-phone').value = '';
-          document.getElementById('cf-message').value = '';
-        } catch {}
-        close();
-      } else {
-        showCenterNotice('Gửi thất bại, vui lòng thử lại.', 'error');
-      }
-
-      setContactLoading(false);
-    })
-    .catch(err => {
-      console.error("Fetch error:", err);
-      setContactLoading(false);
-      showCenterNotice('Có lỗi khi gửi.', 'error');
-    });
-  });
-
-  // Hàm lấy CSRF token
-  function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-        const cookie = cookies[i].trim();
-        if (cookie.substring(0, name.length + 1) === (name + '=')) {
-          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-          break;
-        }
-      }
-    }
-    return cookieValue;
-  }
 })();
 
 });

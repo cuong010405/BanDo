@@ -1524,10 +1524,10 @@ function attachEventHandlers() {
 
       setContactLoading(false);
     })
-    .catch(err => { 
+    .catch(err => {
       console.error("Fetch error:", err);
-      setContactLoading(false); 
-      showCenterNotice('Có lỗi khi gửi.', 'error'); 
+      setContactLoading(false);
+      showCenterNotice('Có lỗi khi gửi.', 'error');
     });
   });
 

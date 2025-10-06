@@ -132,8 +132,16 @@ document.addEventListener('DOMContentLoaded', function () {
     // cong c len c1
     [
       [10.420988, 105.641884],
-      [10.421120, 105.642065],
-      [10.421882, 105.641390]
+      [10.421128, 105.642079],
+      [10.421471, 105.641751],
+      [10.421712, 105.641854]
+      
+    ],
+      // ho boi
+    [
+      [10.421471, 105.641751],
+      [10.422010, 105.641261],
+      [10.422321, 105.640886]
     ],
     // từ gd 1 qua tòa h3
     [
@@ -165,7 +173,59 @@ document.addEventListener('DOMContentLoaded', function () {
       [10.419530, 105.645060],
       [10.419185, 105.645060]
 
+    ],
+    // ky tuc xa doc qua b5-b4-b3-b2-b1
+    [
+      
+      [10.421573, 105.644101],
+      [10.421539, 105.643631],
+      [10.421824, 105.643356],
+      [10.420900, 105.642320],
+      [10.421128, 105.642079]
+
+      
+    ],
+    // qua c2
+    [
+      [10.421400, 105.642886],
+      [10.421759, 105.642538],
+      [10.421590, 105.642350],
+      [10.422172, 105.641802],
+      [10.422120, 105.641495]
+    ],
+    // c1
+    [
+      [10.421851, 105.642105],
+      [10.421712, 105.641854]
+    ],
+    // fusan
+    [
+      [10.421128, 105.642079],
+      [10.421258, 105.642284]
+    ],
+    // qua san pick
+    [
+      [10.421400, 105.642886],
+      [10.421511, 105.642616],
+    ],
+    // qua san bong ro
+    [
+      [10.421400, 105.642886],
+      [10.421696, 105.642917],
     ]
+    ,
+    // 9 giữa b 4 - b3
+    [
+      [10.421400, 105.642886],
+      [10.421004, 105.643245]
+    ]
+    ,
+    // 9 giữa b3 - b2
+    [
+      [10.421241, 105.642700],
+      [10.420853, 105.643059]
+    ]
+
   ];
 
   // Layer riêng cho đường minh họa (để dễ bật/tắt). Vẽ 2 lớp: nền đen dày + vạch trắng mảnh ở giữa.
@@ -281,29 +341,13 @@ function buildStadiumLayer() {
     if (off>maxOff) maxOff=off;
   }
 
-  const gapMeters = 4;
-  const start = Math.floor((minOff-6)/gapMeters);
-  const end = Math.ceil((maxOff+6)/gapMeters);
-  const halfLen = Math.max(maxAlong, bestLen) * 1.4;
-
-  for (let k=start;k<=end;k++){
-    const offset = k*gapMeters;
-    const cx = px*offset, cy = py*offset;
-    const ex1_m = cx - ux*halfLen, ey1_m = cy - uy*halfLen;
-    const ex2_m = cx + ux*halfLen, ey2_m = cy + uy*halfLen;
-    const p1Lat = lat0 + (ey1_m/latM);
-    const p1Lng = lng0 + (ex1_m/lngM);
-    const p2Lat = lat0 + (ey2_m/latM);
-    const p2Lng = lng0 + (ex2_m/lngM);
-    const line = L.polyline([[p1Lat,p1Lng],[p2Lat,p2Lng]], { pane:'stadiumPane', color:'rgba(255,255,255,0.8)', weight:1.4, dashArray:'6,6', interactive:false });
-    stadiumLayer.addLayer(line);
-  }
+  
 
   stadiumLayer.addLayer(poly);
   // label cố định
   const labelIcon = L.divIcon({
     className: 'stadium-label',
-    html: `<div style="background:rgba(11,18,32,0.9);color:#fff;padding:6px 10px;border-radius:8px;font-weight:700">Sân vận động</div>`,
+
     iconSize: [120, 28],
     iconAnchor: [60, -10]
   });

@@ -60,10 +60,23 @@ document.addEventListener('DOMContentLoaded', function () {
     map = L.map(mapEl, {
       center: [10.4209, 105.6439],  // tâm khuôn viên
       zoom: 17,
-      minZoom: 16,                  // zoom nhỏ nhất cho phép
+      minZoom: 18,                  // zoom nhỏ nhất cho phép
       maxZoom: 20,                  // zoom lớn nhất cho phép
+      rotate: true, // cho phép xoay
+      touchRotate: true, // xoay bằng cảm ứng
+      attribution: '', // 👈 bỏ nội dung attribution
 
     });
+    map.attributionControl.setPrefix(false); // bỏ chữ "Leaflet"
+    try{
+    map.createPane('groundPane');        map.getPane('groundPane').style.zIndex = 400;
+    map.createPane('visualBasePane');    map.getPane('visualBasePane').style.zIndex = 500; // nền đen
+    map.createPane('visualCenterPane');  map.getPane('visualCenterPane').style.zIndex = 510; // vạch trắng ở giữa
+    map.createPane('whitePathPane');     map.getPane('whitePathPane').style.zIndex = 520; // đường trắng tương tác
+    map.createPane('stadiumPane');       map.getPane('stadiumPane').style.zIndex = 530;
+    map.createPane('labelPane');         map.getPane('labelPane').style.zIndex = 700; // nhãn luôn trên cùng
+    }catch(e){}
+
     const bounds = [
     [10.4180, 105.6405],
     [10.4230, 105.6460]
@@ -73,9 +86,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Lớp nền OSM
     L.tileLayer('https://cartodb-basemaps-a.global.ssl.fastly.net/light_nolabels/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; OpenStreetMap contributors &copy; Carto',
+  attribution: '',
   subdomains: 'abcd',
   maxZoom: 20
+ 
 }).addTo(map);
 
 
@@ -162,18 +176,29 @@ document.addEventListener('DOMContentLoaded', function () {
     if (customVisualLayer) return customVisualLayer;
     customVisualLayer = L.layerGroup();
     for (const seg of CUSTOM_VISUAL_PATHS) {
-      // nền đường (đen, dày)
-      const base = L.polyline(seg, { color: '#000000', weight: 10, opacity: 0.95, interactive: false, lineJoin: 'round' });
-      // vạch giữa (mảnh, trắng đứt)
-      const center = L.polyline(seg, { color: '#ffffff', weight: 1, opacity: 0.95, dashArray: '10,8', interactive: false, lineCap: 'round' });
-      try { base.bringToBack(); } catch {}
-      try { center.bringToFront(); } catch {}
+      if (!Array.isArray(seg) || seg.length < 2) continue;
+      const base = L.polyline(seg, {
+        pane: 'visualBasePane',
+        color: '#000000',
+        weight: 10,
+        opacity: 0.95,
+        interactive: false,
+        lineJoin: 'round'
+      });
+      const center = L.polyline(seg, {
+        pane: 'visualCenterPane',
+        color: '#ffffff',
+        weight: 1,
+        opacity: 0.95,
+        dashArray: '10,8',
+        interactive: false,
+        lineCap: 'round'
+      });
       customVisualLayer.addLayer(base);
       customVisualLayer.addLayer(center);
     }
     return customVisualLayer;
   }
-
   function drawCustomVisualPaths() {
     if (!map) { setTimeout(drawCustomVisualPaths, 200); return; }
     const layer = buildCustomVisualLayer();
@@ -205,8 +230,6 @@ const STADIUM_POLY = [
   [10.421323, 105.644850],
   [10.420641, 105.644869],
   [10.420644, 105.644361]
-
-
 ];
 
 let stadiumLayer = null;
@@ -217,6 +240,7 @@ function buildStadiumLayer() {
   stadiumLayer = L.layerGroup();
   // nền cỏ xanh + viền
   const poly = L.polygon(STADIUM_POLY, {
+    pane: 'stadiumPane',
     color: '#0f9d58',
     weight: 2,
     opacity: 0.95,
@@ -225,28 +249,65 @@ function buildStadiumLayer() {
     lineJoin: 'round'
   });
   // hàng kẻ sân (song song) — vài đường để giống sân vận động
-  const stripes = [];
-  for (let i = 0; i < STADIUM_POLY.length - 1; i++) {
-    const a = STADIUM_POLY[i];
-    const b = STADIUM_POLY[(i+1) % STADIUM_POLY.length];
-    const mx = (a[0] + b[0]) / 2;
-    const my = (a[1] + b[1]) / 2;
-    stripes.push([[mx, my], [(mx + a[0]) / 2, (my + a[1]) / 2]]);
+  const centroid = poly.getBounds().getCenter();
+  const lat0 = centroid.lat, lng0 = centroid.lng;
+  const sc = metersPerDeg(lat0);
+  const latM = sc.latM, lngM = sc.lngM;
+
+  // tìm cạnh dài nhất để xác định hướng kẻ
+  const ptsM = STADIUM_POLY.map(p => ({ x: (p[1]-lng0)*lngM, y: (p[0]-lat0)*latM }));
+  let bestLen = 0, bestIdx = 0;
+  for (let i=0;i<ptsM.length;i++){
+    const a=ptsM[i], b=ptsM[(i+1)%ptsM.length];
+    const Ld = Math.hypot(b.x-a.x, b.y-a.y);
+    if (Ld>bestLen){ bestLen=Ld; bestIdx=i; }
   }
-  stripes.forEach(s => {
-    const line = L.polyline(s, { color: 'rgba(255,255,255,0.7)', weight: 1.2, dashArray: '4,6', interactive: false });
+  // unit vector along edge
+  let ux=1, uy=0;
+  if (bestLen>0){
+    const a=ptsM[bestIdx], b=ptsM[(bestIdx+1)%ptsM.length];
+    const dx=b.x-a.x, dy=b.y-a.y, Ld=Math.hypot(dx,dy)||1;
+    ux=dx/Ld; uy=dy/Ld;
+  }
+  const px=-uy, py=ux;
+
+  // project pts to get ranges
+  let maxAlong=0, minOff=Infinity, maxOff=-Infinity;
+  for (const p of ptsM){
+    const along = Math.abs(p.x*ux + p.y*uy);
+    const off = p.x*px + p.y*py;
+    if (along>maxAlong) maxAlong=along;
+    if (off<minOff) minOff=off;
+    if (off>maxOff) maxOff=off;
+  }
+
+  const gapMeters = 4;
+  const start = Math.floor((minOff-6)/gapMeters);
+  const end = Math.ceil((maxOff+6)/gapMeters);
+  const halfLen = Math.max(maxAlong, bestLen) * 1.4;
+
+  for (let k=start;k<=end;k++){
+    const offset = k*gapMeters;
+    const cx = px*offset, cy = py*offset;
+    const ex1_m = cx - ux*halfLen, ey1_m = cy - uy*halfLen;
+    const ex2_m = cx + ux*halfLen, ey2_m = cy + uy*halfLen;
+    const p1Lat = lat0 + (ey1_m/latM);
+    const p1Lng = lng0 + (ex1_m/lngM);
+    const p2Lat = lat0 + (ey2_m/latM);
+    const p2Lng = lng0 + (ex2_m/lngM);
+    const line = L.polyline([[p1Lat,p1Lng],[p2Lat,p2Lng]], { pane:'stadiumPane', color:'rgba(255,255,255,0.8)', weight:1.4, dashArray:'6,6', interactive:false });
     stadiumLayer.addLayer(line);
-  });
+  }
+
   stadiumLayer.addLayer(poly);
   // label cố định
   const labelIcon = L.divIcon({
     className: 'stadium-label',
-   
+    html: `<div style="background:rgba(11,18,32,0.9);color:#fff;padding:6px 10px;border-radius:8px;font-weight:700">Sân vận động</div>`,
     iconSize: [120, 28],
     iconAnchor: [60, -10]
   });
-  const centroid = poly.getBounds().getCenter();
-  const label = L.marker([centroid.lat, centroid.lng], { icon: labelIcon, interactive: false });
+  const label = L.marker([centroid.lat, centroid.lng], { pane: 'labelPane', icon: labelIcon, interactive: false });
   stadiumLayer.addLayer(label);
   return stadiumLayer;
 }
@@ -286,6 +347,7 @@ function buildPoolLayer() {
   poolLayer = L.layerGroup();
   // nền nước xanh nhạt + viền
   const poly = L.polygon(POOL_POLY, {
+    pane: 'stadiumPane',
     color: '#0ea5e9',
     weight: 2,
     opacity: 0.95,
@@ -302,19 +364,19 @@ function buildPoolLayer() {
     [[10.42248,105.64100],[10.42222,105.64100]]
   ];
   midpoints.forEach(mp => {
-    const wave = L.polyline(mp, { color: 'rgba(255,255,255,0.85)', weight: 1.2, dashArray: '4,6', interactive: false });
+    const wave = L.polyline(mp, { pane:'stadiumPane', color: 'rgba(255,255,255,0.85)', weight: 1.2, dashArray: '4,6', interactive: false });
     poolLayer.addLayer(wave);
   });
 
   // label hồ bơi
   const labelIcon = L.divIcon({
     className: 'pool-label',
-    html: `<div style="background:rgba(3,105,161,0.9);color:#fff;padding:6px 10px;border-radius:8px;font-weight:700">Hồ bơi</div>`,
+
     iconSize: [90, 28],
     iconAnchor: [45, -10]
   });
   const centroid = poly.getBounds().getCenter();
-  const label = L.marker([centroid.lat, centroid.lng], { icon: labelIcon, interactive: false });
+  const label = L.marker([centroid.lat, centroid.lng], { pane:'labelPane', icon: labelIcon, interactive: false });
   poolLayer.addLayer(label);
 
   return poolLayer;
@@ -339,14 +401,13 @@ window.togglePool = function() { poolVisible = !poolVisible; if (poolVisible) dr
 try { drawPool(); } catch (e) {}
 // --- KẾT THÚC: hồ bơi ---
 
-// ...existing code...
-
   // --- ĐƯỜNG TRẮNG RIÊNG (dùng cho vẽ chỗ xen kẽ) ---
   // Mảng chứa các đoạn đường trắng: mỗi phần là một mảng [ [lat,lng], ... ]
   let CUSTOM_WHITE_PATHS = [
-    [10.421097, 105.642078],
-    [10.420994, 105.642183]
-
+    [
+      [10.421097, 105.642078],
+      [10.420994, 105.642183]
+    ]
   ];
 
   // Layer & trạng thái
@@ -365,8 +426,8 @@ try { drawPool(); } catch (e) {}
     for (const seg of CUSTOM_WHITE_PATHS) {
       if (!Array.isArray(seg) || seg.length < 2) continue;
       // outline nhẹ để nổi trên nền sáng
-      const outline = L.polyline(seg, { color: 'rgba(0,0,0,0.12)', weight: 6, opacity: 0.6, interactive: false, lineJoin: 'round' });
-      const white = L.polyline(seg, { color: '#ffffff', weight: 3.2, opacity: 0.98, interactive: false, lineJoin: 'round' });
+      const outline = L.polyline(seg, { pane:'whitePathPane', color: 'rgba(0,0,0,0.12)', weight: 6, opacity: 0.6, interactive: false, lineJoin: 'round' });
+      const white = L.polyline(seg, { pane:'whitePathPane', color: '#ffffff', weight: 3.2, opacity: 0.98, interactive: false, lineJoin: 'round' });
       customWhiteLayer.addLayer(outline);
       customWhiteLayer.addLayer(white);
     }
@@ -386,13 +447,13 @@ try { drawPool(); } catch (e) {}
 
   // --- Interactive drawing helpers (click để thêm điểm, dblclick hoặc Enter để hoàn tất, Esc hủy) ---
   function _createDraftMarker(latlng) {
-    const m = L.circleMarker(latlng, { radius: 4, color: '#000', weight: 1, fillColor: '#fff', fillOpacity: 1 }).addTo(map);
+    const m = L.circleMarker(latlng, { pane:'whitePathPane', radius: 4, color: '#000', weight: 1, fillColor: '#fff', fillOpacity: 1 }).addTo(map);
     _draftMarkers.push(m);
   }
   function _updateDraftLine() {
     if (_draftLine) removeLayerIfExists(_draftLine);
     if (!_draftWhite || _draftWhite.length < 2) return;
-    _draftLine = L.polyline(_draftWhite, { color: '#ffffff', weight: 3.2, opacity: 0.98, interactive: false }).addTo(map);
+    _draftLine = L.polyline(_draftWhite, { pane:'whitePathPane', color: '#ffffff', weight: 3.2, opacity: 0.98, interactive: false }).addTo(map);
   }
 
   function startWhitePathDraw() {
@@ -470,9 +531,6 @@ try { drawPool(); } catch (e) {}
   // Tự vẽ nếu muốn lúc load
   try { drawCustomWhitePaths(); } catch (e) {}
 
-  // ...existing code...
-
-
       initCampusPOIs();
       centerToCampus();
       try { if (typeof drawCampusOnlyPaths === 'function') drawCampusOnlyPaths(); } catch (e) { console.warn('drawCampusOnlyPaths error', e); }
@@ -536,7 +594,6 @@ function attachEventHandlers() {
   }
 
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeOverlay(); });
-// ...existing code...
   const locBtnElem = document.getElementById('loc-btn');
   let _trackingBlink = false; // trạng thái nháy
   function startTrackingBlink() {
@@ -555,13 +612,9 @@ function attachEventHandlers() {
     _trackingBlink = false;
   }
 
-  
-
   // Expose để gọi từ logic theo dõi (ví dụ khi stopWatchPosition)
   window.startTrackingBlink = startTrackingBlink;
   window.stopTrackingBlink = stopTrackingBlink;
-// ...existing code...
-
 
   }
 
@@ -624,7 +677,7 @@ function attachEventHandlers() {
   }
   function setLoading(loading, opts = {}) {
     const loader = ensureGlobalLoader();
-    const MIN_MS = 2000; // tối thiểu 2 giây
+    const MIN_MS = 3000; // tối thiểu 3 giây
     if (loading) {
       try { if (loadingHideTimer) clearTimeout(loadingHideTimer); } catch {}
       loadingHideTimer = null;
@@ -838,7 +891,6 @@ function attachEventHandlers() {
         fillColor: '#10b981',
         fillOpacity: 0.7
       }).addTo(map);
-      try { startMarker.bringToFront(); } catch {}
     }
     startEl.value = label || formatLatLng(latlng);
     startEl.dataset.lat = latlng.lat;
@@ -857,7 +909,6 @@ function attachEventHandlers() {
         fillColor: '#ef4444',
         fillOpacity: 0.7
       }).addTo(map);
-      try { endMarker.bringToFront(); } catch {}
     }
     endEl.value = label || formatLatLng(latlng);
     endEl.dataset.lat = latlng.lat;
@@ -1024,9 +1075,6 @@ function attachEventHandlers() {
         userAccuracyCircle.setRadius(acc);
       }
 
-      try { userAccuracyCircle && userAccuracyCircle.bringToBack(); } catch {}
-      try { userLocationMarker && userLocationMarker.bringToFront(); } catch {}
-
       prevUserLatLng = ll;
 
       if (!initializedStartFromWatch) {
@@ -1192,85 +1240,67 @@ function attachEventHandlers() {
     if (campusPoiLayer) { removeLayerIfExists(campusPoiLayer); campusPoiLayer = null; }
     campusPoiLayer = L.layerGroup().addTo(map);
 
-    // ...existing code...
     function buildPoiIcon(label, colorHint) {
       const safe = label ? String(label).replace(/[<>&"]/g, s => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[s])) : '';
-      // Chọn màu mặc định theo từ khóa (có thể thêm rules hoặc truyền colorHint khi tạo POI)
       const k = (label || '').toLowerCase();
       let color = colorHint ||  k.includes('thư viện') ? '#6366f1'  // tím cho tòa / thư viện
-                     : k.includes('Nhà') ? '#ef4444'                                 // đỏ cho sân
-                     : k.includes('nhà xe') ? '#f59e0b'                              // cam cho nhà xe
-                     : k.includes('ký túc') ? '#06b6d4'                              // teal cho ký túc xá
-                      : k.includes('cổng') ? '#10b981'                                 // xanh lá cho cổng
-                      : k.includes('sân') ? '#3b82f6'                                  // xanh dương cho sân
-                      : k.includes('hồ') ? '#0ea5e9'                                   // xanh nước cho hồ
-
-                      : k.includes('nhà thi đấu') ? '#8b5cf6'                          // tím đậm cho nhà thi đấu
-                      : k.includes('pickleball') ? '#f97316'                           // cam đậm cho sân pickleball
-                      : k.includes('giáo') ? '#eab308'                             // vàng cho giảng đường
-                      : k.includes('khu') ? '#8cff00ff'                                // xanh mạ cho khu vực
-                      : k.includes('hiệu') ? '#0ea5e9'                            // xanh nước cho trung tâm
-                      : '#e70384ff';                                                   // mặc định xanh lá
-
-      // HTML inline styles để tránh cần CSS bên ngoài
+                     : k.includes('Nhà') ? '#ef4444'
+                     : k.includes('nhà xe') ? '#f59e0b'
+                     : k.includes('ký túc') ? '#06b6d4'
+                      : k.includes('cổng') ? '#10b981'
+                      : k.includes('sân') ? '#3b82f6'
+                      : k.includes('hồ') ? '#0ea5e9'
+                      : k.includes('nhà thi đấu') ? '#8b5cf6'
+                      : k.includes('pickleball') ? '#f97316'
+                      : k.includes('giáo') ? '#eab308'
+                      : k.includes('khu') ? '#8cff00ff'
+                      : k.includes('hiệu') ? '#0ea5e9'
+                      : '#e70384ff';
       const dotHtml = `<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 4px 8px rgba(0,0,0,.12)"></div>`;
       const labelHtml = `<div style="background:#fff;color:#0b1220;padding:6px 10px;border-radius:12px;font-weight:600;font-size:13px;white-space:nowrap;box-shadow:0 8px 20px rgba(11,18,32,.06);">${safe}</div>`;
       const html = `<div style="display:flex;align-items:center;gap:8px;transform:translateY(-8px)">${dotHtml}${labelHtml}</div>`;
-
-      // iconSize/iconAnchor có thể điều chỉnh để vị trí nhãn hiển thị tốt
       return L.divIcon({ className: 'poi-icon', html, iconSize: [160, 36], iconAnchor: [20, 18] });
     }
-// ...existing code...
 
     const campusPOIs = [
           { id: 'gateC',    name: 'Cổng C',    lat: 10.421031, lng: 105.641932, description: 'Cổng C của khuôn viên trường.' },
           { id: 'gateB',    name: 'Cổng B',    lat: 10.420366, lng: 105.642533, description: 'Cổng B của khuôn viên trường.' },
-
           { id: 'buildingB1', name: 'Nhà B1', lat: 10.420717, lng: 105.642506, description: 'Nhà B1' },
           { id: 'buildingB2', name: 'Nhà B2', lat: 10.420904, lng: 105.642823, description: 'Nhà B2' },
           { id: 'buildingB3', name: 'Nhà B3', lat: 10.421105, lng: 105.643024, description: 'Nhà B3' },
           { id: 'buildingB4', name: 'Nhà B4', lat: 10.421303, lng: 105.643228, description: 'Nhà B4' },
           { id: 'buildingB5', name: 'Nhà B5', lat: 10.421485, lng: 105.643474, description: 'Nhà B5' },
-
           { id: 'buildingC1', name: 'Nhà C1', lat: 10.421712, lng: 105.641854, description: 'Nhà C1' },
           { id: 'buildingC2', name: 'Nhà C2', lat: 10.422120, lng: 105.641495, description: 'Nhà C2' },
-
           { id: 'buildingA1', name: 'Nhà A1', lat: 10.420419, lng: 105.643402, description: 'Nhà A1' },
           { id: 'buildingA4', name: 'Nhà A4', lat: 10.420327, lng: 105.643968, description: 'Nhà A4' },
           { id: 'buildingA7', name: 'Nhà A7', lat: 10.419032, lng: 105.643874, description: 'Nhà A7' },
           { id: 'buildingA8', name: 'Nhà A8', lat: 10.419274, lng: 105.644832, description: 'Nhà A8' },
           { id: 'buildingA9', name: 'Nhà A9', lat: 10.418984, lng: 105.644384, description: 'Nhà A9' },
-
           { id: 'buildingT1', name: 'Nhà T3', lat: 10.419760, lng: 105.644797, description: 'Nhà T3' },
           { id: 'buildingT2', name: 'Nhà T2', lat: 10.419530, lng: 105.645060, description: 'Nhà T2' },
           { id: 'buildingT3', name: 'Nhà T1', lat: 10.419185, lng: 105.645060, description: 'Nhà T1' },
-
           { id: 'buildingH1', name: 'Nhà H1', lat: 10.420601, lng: 105.643611, description: 'Nhà H1' },
           { id: 'buildingH2', name: 'Nhà H2', lat: 10.419686, lng: 105.644293, description: 'Nhà H2' },
           { id: 'buildingH3', name: 'Nhà H3', lat: 10.420142, lng: 105.644641, description: 'Nhà H3' },
-
           { id: 'sports hall',       name: 'Nhà thi đấu đa năng', lat: 10.421258, lng: 105.642284, description: 'Nhà thi đấu đa năng' },
           { id: 'pickleball court',  name: 'Sân pickleball',       lat: 10.421511, lng: 105.642616, description: 'Sân pickleball' },
           { id: 'basketball court',  name: 'Sân basketball',       lat: 10.421696, lng: 105.642917, description: 'Sân basketball' },
           { id: 'soccer field',      name: 'Sân soccer',           lat: 10.420978, lng: 105.644630, description: 'Sân soccer' },
           { id: 'experimental area', name: 'Khu thí nghiệm',       lat: 10.420794, lng: 105.644998, description: 'Khu thí nghiệm' },
-
           { id: 'hall-a',   name: 'Giảng đường A',  lat: 10.419691, lng: 105.643799, description: 'Giảng đường lớn dành cho các lớp học tập trung.' },
           { id: 'library',  name: 'Thư viện',       lat: 10.421060, lng: 105.643770, description: 'Thư viện trường, mở cửa từ 7:30 - 20:00.' },
           { id: 'dorm',     name: 'Ký túc xá',      lat: 10.421669, lng: 105.643866, description: 'Ký túc xá sinh viên.' },
           { id: 'hieubo',   name: 'Hiệu bộ',        lat: 10.420409, lng: 105.642938, description: 'Hiệu bộ trường Đại học Đồng Tháp.' },
-
           { id: 'parkingB', name: 'Nhà xe cổng B',  lat: 10.421197, lng: 105.643890, description: 'Khu vực gửi xe cho sinh viên và cán bộ.' },
           { id: 'parkingC', name: 'Nhà xe cổng C',  lat: 10.421073, lng: 105.642450, description: 'Khu vực gửi xe cho sinh viên và cán bộ.' },
-
           { id: 'school',   name: 'Trường mẫu giáo', lat: 10.418921, lng: 105.644955, description: 'Trường mẫu giáo dành cho con em cán bộ và sinh viên.' },
           { id: 'pool',     name: 'Hồ bơi',          lat: 10.422321, lng: 105.640886, description: 'Hồ bơi' }
-];
+    ];
 
-          campusPOIs.forEach(p => {
-      
-      const marker = L.marker([p.lat, p.lng], { icon: buildPoiIcon(p.name) });
-            marker.on('click', () => {
+    campusPOIs.forEach(p => {
+      const marker = L.marker([p.lat, p.lng], { pane:'labelPane', icon: buildPoiIcon(p.name) });
+      marker.on('click', () => {
         const meta = { name: p.name, description: p.description, display_name: p.name };
         const latlng = { lat: p.lat, lng: p.lng };
         showPlaceInfo(latlng, meta);
@@ -1281,7 +1311,6 @@ function attachEventHandlers() {
     });
   }
 
-  
   // Tuyến thủ công nội bộ (polyline) giữa các POI trong khuôn viên
   const CAMPUS_PATH_ORDER = [
     { name: 'Sân soccer',     lat: 10.420825, lng: 105.644397 },
@@ -1301,25 +1330,6 @@ function attachEventHandlers() {
   ];
 
   // ==== Lưới lối đi (walkway) – vẽ bằng các polyline bám "khoảng trống" ====
-  // Có thể thêm/bớt các đoạn để bám đúng lối đi thực tế. Tuyến sẽ tìm đường ngắn nhất trên lưới này.
-  const WALKWAY_NETWORK = [
-    // Nhánh bắc: Sân basketball → B4 → Nhà xe cổng C → Cổng C
-    [ [10.421696,105.642917], [10.420982, 105.642103], [10.421181, 105.642295], [10.421073,105.642450], [10.421031,105.641932] ],
-    // Nhánh về Cổng B qua B2, B1
-    [ [10.421073,105.642450], [10.420904,105.642823], [10.420717,105.642506], [10.420366,105.642533] ],
-    // Nhánh B3 → Thư viện → Nhà xe B → Ký túc xá
-    [ [10.421105,105.643024], [10.421060,105.643770], [10.421197,105.643890], [10.421669,105.643866] ],
-    // Nhánh A1 → Giảng đường A → A7 → A9
-    [ [10.420419,105.643402], [10.419691,105.643799], [10.419032,105.643874], [10.418984,105.644384] ],
-    // Nhánh Giảng đường A → H2 → A8 → T1 → T3 → Trường mẫu giáo
-    [ [10.419691,105.643799], [10.419686,105.644293], [10.419274,105.644832], [10.419760,105.644797], [10.419385,105.645060], [10.418921,105.644955] ],
-    // Nhánh Ký túc xá → T1 (đi mép phía đông)
-    [ [10.421669,105.643866], [10.421400,105.644200], [10.420600,105.644550], [10.419760,105.644797] ],
-    // Nhánh Sân soccer → Khu thí nghiệm
-    [ [10.420825,105.644397], [10.420781,105.644899] ],
-    // Nhánh nối trung tâm: B4 ↔ B3 ↔ B2 ↔ B1
-    [ [10.421303,105.643228], [10.421105,105.643024], [10.420904,105.642823], [10.420717,105.642506] ]
-  ];
 
   function _round6(x){ return Math.round(x*1e6)/1e6; }
   function _hashLL(lat,lng){ return `${_round6(lat)},${_round6(lng)}`; }
@@ -1340,10 +1350,23 @@ function attachEventHandlers() {
       adj.get(a.id).push({ to: b.id, weight: w });
       adj.get(b.id).push({ to: a.id, weight: w });
     }
-    for (const line of WALKWAY_NETWORK){
+
+    // Kết hợp WALKWAY_NETWORK + CUSTOM_VISUAL_PATHS + CAMPUS_MANUAL_PATH
+    const allLines = [];
+    if (Array.isArray(WALKWAY_NETWORK)) allLines.push(...WALKWAY_NETWORK);
+    if (Array.isArray(CUSTOM_VISUAL_PATHS)) {
+      for (const seg of CUSTOM_VISUAL_PATHS) if (Array.isArray(seg) && seg.length>=2) allLines.push(seg);
+    }
+    if (Array.isArray(CAMPUS_MANUAL_PATH) && CAMPUS_MANUAL_PATH.length>=2) {
+      allLines.push(CAMPUS_MANUAL_PATH);
+    }
+
+    for (const line of allLines){
       for (let i=1;i<line.length;i++){
-        const p1 = ensureNode(line[i-1][0], line[i-1][1]);
-        const p2 = ensureNode(line[i][0], line[i][1]);
+        const pA = line[i-1], pB = line[i];
+        if (!Array.isArray(pA) || !Array.isArray(pB)) continue;
+        const p1 = ensureNode(pA[0], pA[1]);
+        const p2 = ensureNode(pB[0], pB[1]);
         link(p1,p2);
       }
     }
@@ -1423,7 +1446,6 @@ function attachEventHandlers() {
       ['Thư viện',10.421060,105.643770,22], ['Ký túc xá',10.421669,105.643866,22], ['Hiệu bộ',10.420409,105.642938,18],
       ['Nhà xe cổng B',10.421197,105.643890,16], ['Nhà xe cổng C',10.421073,105.642450,16],
       ['Sân pickleball',10.421511,105.642616,14], ['Sân basketball',10.421696,105.642917,16],
-      // Dải cản đường chéo (chặn lối chéo cắt qua khối giữa pickleball → B5)
       ['NoDiag1',10.421200,105.642700,10],
       ['NoDiag2',10.421300,105.642930,10],
       ['NoDiag3',10.421410,105.643180,10],
@@ -1483,15 +1505,13 @@ function attachEventHandlers() {
       let ix = Math.round((xm-minX)/cell), iy = Math.round((ym-minY)/cell);
       ix = Math.max(0, Math.min(w-1, ix)); iy = Math.max(0, Math.min(h-1, iy));
       if (!block[idx(ix,iy)]) return {ix,iy};
-      // tìm ô trống gần nhất (BFS nhỏ)
       const q=[[ix,iy]], seen=new Set([idx(ix,iy)]);
       const dirs=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
       while(q.length){ const [cx,cy]=q.shift(); for (const d of dirs){ const nx=cx+d[0], ny=cy+d[1]; if(nx<0||ny<0||nx>=w||ny>=h) continue; const k=idx(nx,ny); if(seen.has(k)) continue; seen.add(k); if(!block[k]) return {ix:nx,iy:ny}; q.push([nx,ny]); } }
       return {ix,iy};
     }
     const sCell = clampCellNear(ps.x, ps.y); const eCell = clampCellNear(pe.x, pe.y);
-    // A* octile
-    const D=1, D2=1.5; // tăng chi phí đi chéo để hạn chế cắt góc
+    const D=1, D2=1.5;
     const gScore = new Float32Array(w*h); for (let i=0;i<gScore.length;i++) gScore[i]=Infinity;
     const fScore = new Float32Array(w*h); for (let i=0;i<fScore.length;i++) fScore[i]=Infinity;
     const prev = new Int32Array(w*h); for (let i=0;i<prev.length;i++) prev[i]=-1;
@@ -1510,17 +1530,14 @@ function attachEventHandlers() {
     }
     if (prev[goal]===-1 && goal!==start) return null;
     const path=[]; let cur=goal; path.push(cur); while(cur!==start){ cur=prev[cur]; if (cur<0) break; path.push(cur); } path.reverse();
-    // build coords
     const pts=[]; pts.push([s[0], s[1]]);
     for (const p of path){ const cx=p%w, cy=(p/w)|0; const c=cellCenter(cx,cy); const ll=unproject(lat0,lng0,c.x,c.y); pts.push([ll.lat, ll.lng]); }
     pts.push([e[0], e[1]]);
-    // simplify ~ 2-4 m
-    const simp = rdpSimplify(pts, 0.000015); // ~1.5-2 m, giảm nguy cơ cắt qua mép toà
+    const simp = rdpSimplify(pts, 0.000015);
     return simp;
   }
 
   // ==== Đồ thị tuyến nội bộ trong khuôn viên (shortest path) ====
-  // Dùng các POI làm nút và định nghĩa các cạnh nội bộ, tính đường ngắn nhất bằng Dijkstra
   function buildCampusGraph(){
     const nodes = new Map();
     const poiTable = {
@@ -1734,12 +1751,30 @@ function attachEventHandlers() {
     return sum;
   }
 
+  // Vẽ tuyến thủ công (màu tím) — sửa để không gây "nhảy", vẽ trên các pane đã tạo
   function drawManualRouteCoords(coords){
     if (!Array.isArray(coords) || coords.length < 2) return;
     if (routeLine) { removeLayerIfExists(routeLine); routeLine = null; }
-    routeLine = L.polyline(coords, { color: '#7c3aed', weight: 6, opacity: 0.9 }).addTo(map);
-    const b = routeLine.getBounds();
-    if (b && typeof b.isValid === 'function' && b.isValid()) map.fitBounds(b, { padding: [28, 28] });
+
+    routeLine = L.layerGroup();
+    const outline = L.polyline(coords, { pane: 'visualBasePane', color: 'rgba(0,0,0,0.18)', weight: 8, opacity: 0.9, interactive: false, lineJoin: 'round' });
+    const main = L.polyline(coords, { pane: 'visualCenterPane', color: '#7c3aed', weight: 6, opacity: 0.98, interactive: false, lineJoin: 'round' });
+    routeLine.addLayer(outline);
+    routeLine.addLayer(main);
+    routeLine.addTo(map);
+
+    // Không fitBounds tự động mỗi lần chọn — chỉ pan nhẹ tới centroid nếu cần
+    try {
+      const bounds = L.featureGroup([main]).getBounds();
+      if (bounds && bounds.isValid()) {
+        const mapCenter = map.getCenter();
+        if (!bounds.contains(mapCenter)) {
+          const c = bounds.getCenter();
+          map.panTo(c, { animate: true, duration: 0.6 });
+        }
+      }
+    } catch(e) {}
+
     const dist = totalPathDistanceMeters(coords);
     const speedMps = 1.2; // ~4.3 km/h
     const dur = dist / speedMps;
@@ -1754,10 +1789,24 @@ function attachEventHandlers() {
     const s = await resolveInputCoords(startEl);
     const e = await resolveInputCoords(endEl);
 
-    // Ưu tiên 0: Beeline A* n���i bộ khuôn viên (chỉ khi cả hai điểm gần khuôn viên)
+    // Ưu tiên 0: Beeline A* nội bộ khuôn viên (chỉ khi cả hai điểm gần khuôn viên)
     const campusCenter = { lat: 10.4209, lng: 105.6439 };
     const nearCampus = distanceMeters({lat:s[0],lng:s[1]}, campusCenter) < 1200 && distanceMeters({lat:e[0],lng:e[1]}, campusCenter) < 1200;
     if (nearCampus) {
+      // 1) thử bắt tuyến tím (CAMPUS_MANUAL_PATH)
+      const manualSnap = buildSnappedManualRouteCoords(s, e);
+      if (manualSnap) {
+        drawManualRouteCoords(manualSnap);
+        return;
+      }
+      // 2) thử lưới walkway (dùng cả CUSTOM_VISUAL_PATHS)
+      const walkCoords = tryWalkwayRoute(s, e);
+      if (Array.isArray(walkCoords) && walkCoords.length >= 2) {
+        const simp = rdpSimplify(walkCoords, 0.000012);
+        drawManualRouteCoords(simp);
+        return;
+      }
+      // 3) fallback A* grid
       const gridCoords = tryBeelineGridRoute(s, e);
       if (Array.isArray(gridCoords) && gridCoords.length >= 2) {
         drawManualRouteCoords(gridCoords);
@@ -1765,7 +1814,6 @@ function attachEventHandlers() {
       }
     }
 
-    
     if (!Array.isArray(s) || !Array.isArray(e)) throw new Error('Vui lòng nhập địa chỉ hoặc toạ độ hợp lệ cho cả hai điểm.');
 
     // Cập nhật marker start/end (không kích hoạt tìm lại trong khi đang tính)
@@ -1812,67 +1860,8 @@ function attachEventHandlers() {
       }
       map.setView([parseFloat(pref.lat), parseFloat(pref.lon)], 17);
     } catch {
-      map.setView([10.455900, 105.633100], 17);
+      map.setView([10.455900, 105.633100], 15);
     }
   }
-
-  // Liên hệ: mở form và gửi mailto (chuyển từ HTML sang JS)
-  (function(){
-  const openBtn = document.getElementById('open-contact');
-  const scrim = document.getElementById('contact-overlay-scrim');
-  const card = document.getElementById('contact-overlay-card');
-  const closeBtn = document.getElementById('contact-close');
-  const cancelBtn = document.getElementById('contact-cancel');
-
-  // Helper: loading overlay khi gửi liên hệ
-  let noticeTimer = null;
-  function ensureContactLoader(){
-    let el = document.getElementById('contact-loading');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'contact-loading';
-      el.style.cssText = 'position:fixed;inset:0;z-index:10003;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;';
-      const box = document.createElement('div');
-      box.style.cssText = 'background:#0b1220;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,.35);';
-      const sp = document.createElement('div');
-      sp.style.cssText = 'width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:#22d3ee;animation:glspin .9s linear infinite;';
-      const tx = document.createElement('div');
-      tx.textContent = 'Đang gửi...';
-      tx.style.cssText = 'color:#e5e7eb;font-weight:600;';
-      box.appendChild(sp); box.appendChild(tx);
-      el.appendChild(box);
-      document.body.appendChild(el);
-    }
-    // Đảm bảo @keyframes cho spinner luôn tồn tại (trường hợp chưa dùng loader tìm đường)
-    if (!document.getElementById('global-loader-style')) {
-      const st = document.createElement('style');
-      st.id = 'global-loader-style';
-      st.textContent = '@keyframes glspin { to { transform: rotate(360deg); } }';
-      document.head.appendChild(st);
-    }
-    return el;
-  }
-  function setContactLoading(on){ const el = ensureContactLoader(); el.style.display = on ? 'flex' : 'none'; }
-
-  // Helper: thông báo ở giữa màn hình
-  function ensureCenterNotice(){
-    let el = document.getElementById('center-notice');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'center-notice';
-      el.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10004;display:none;';
-      const box = document.createElement('div');
-      box.id = 'center-notice-box';
-      box.style.cssText = 'min-width:260px;max-width:80vw;background:#0b1220;color:#e5e7eb;border:1px solid rgba(255,255,255,.08);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.45);padding:14px 16px;text-align:center;font-weight:600;';
-      el.appendChild(box);
-      document.body.appendChild(el);
-    }
-    return el;
-  }
-  
-
-  
-
-})();
 
 });

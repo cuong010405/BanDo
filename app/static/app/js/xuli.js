@@ -112,7 +112,8 @@ document.addEventListener('DOMContentLoaded', function () {
     // 2) đoạn từ Cổng B lên thẳng nhà xe
     [
       [10.420353, 105.642506],
-      [10.421360, 105.643647]
+      [10.421360, 105.643647],
+      [10.421451, 105.643890]
 
       
     ],
@@ -185,6 +186,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
       
     ],
+    //  đăng kí lao động
+    [
+      [10.421573, 105.644101],
+      [10.421582, 105.644240]
+    ],
+    //vong nhà xe
+    [
+      [10.421557, 105.643877],
+      [10.421451, 105.643890],
+      [10.421360, 105.643647]
+
+    ],
+    // từ kí túc xá xuống nhà xe
+    [
+      [10.421451, 105.643890],
+      [10.421197, 105.643890]
+    ],
     // qua c2
     [
       [10.421400, 105.642886],
@@ -224,7 +242,55 @@ document.addEventListener('DOMContentLoaded', function () {
     [
       [10.421241, 105.642700],
       [10.420853, 105.643059]
+    ],
+    // qua A4
+    [
+      [10.420029, 105.644001],
+      [10.420106, 105.643889],
+      [10.420235, 105.643895],
+      [10.420327, 105.643968]
+
+    ],
+    // lòn vòng H1
+    [
+      [10.420235, 105.643895],
+      [10.420267, 105.643646],
+      [10.420869, 105.643093]
+    ],
+    // vong  ben nhà xe
+    [
+      [10.420235, 105.643895],
+      [10.420615, 105.643925],
+      [10.421167, 105.643439],
+    ],
+    // cat cho ngoi sau H1
+    [
+      [10.420615, 105.643925],
+      [10.420338, 105.643590]
+    ],
+    // thu vien
+    [
+      [10.420948, 105.643639],
+      [10.421060, 105.643770]
+    ],
+    // nhà xe
+    [
+      [10.420615, 105.643925],
+      [10.420932, 105.644067],
+      [10.421197, 105.643890]
+    ],
+    // khu thi nghiem
+    [
+      [10.420615, 105.643925],
+      [10.420601, 105.644991],
+      [10.420794, 105.644998]
+    ],
+    // san bóng
+    [
+      [10.420932, 105.644067],
+      [10.420978, 105.644630]
     ]
+
 
   ];
 
@@ -721,7 +787,7 @@ function attachEventHandlers() {
   }
   function setLoading(loading, opts = {}) {
     const loader = ensureGlobalLoader();
-    const MIN_MS = 3000; // tối thiểu 3 giây
+    const MIN_MS = 1500; // tối thiểu 2 giây
     if (loading) {
       try { if (loadingHideTimer) clearTimeout(loadingHideTimer); } catch {}
       loadingHideTimer = null;
@@ -1326,20 +1392,23 @@ function attachEventHandlers() {
           { id: 'buildingT3', name: 'Nhà T1', lat: 10.419185, lng: 105.645060, description: 'Nhà T1' },
           { id: 'buildingH1', name: 'Nhà H1', lat: 10.420601, lng: 105.643611, description: 'Nhà H1' },
           { id: 'buildingH2', name: 'Nhà H2', lat: 10.419686, lng: 105.644293, description: 'Nhà H2' },
-          { id: 'buildingH3', name: 'Nhà H3', lat: 10.420142, lng: 105.644641, description: 'Nhà H3' },
+          { id: 'buildingH3', name: 'Nhà Khát Vọng', lat: 10.420142, lng: 105.644641, description: 'Nhà H3' },
           { id: 'sports hall',       name: 'Nhà thi đấu đa năng', lat: 10.421258, lng: 105.642284, description: 'Nhà thi đấu đa năng' },
           { id: 'pickleball court',  name: 'Sân pickleball',       lat: 10.421511, lng: 105.642616, description: 'Sân pickleball' },
           { id: 'basketball court',  name: 'Sân basketball',       lat: 10.421696, lng: 105.642917, description: 'Sân basketball' },
           { id: 'soccer field',      name: 'Sân soccer',           lat: 10.420978, lng: 105.644630, description: 'Sân soccer' },
           { id: 'experimental area', name: 'Khu thí nghiệm',       lat: 10.420794, lng: 105.644998, description: 'Khu thí nghiệm' },
-          { id: 'hall-a',   name: 'Giảng đường A',  lat: 10.419691, lng: 105.643799, description: 'Giảng đường lớn dành cho các lớp học tập trung.' },
+          { id: 'hall-a',   name: 'Nhà A3',         lat: 10.419691, lng: 105.643799, description: 'Giảng đường lớn dành cho các lớp học tập trung.' },
+          { id: 'hall-1',   name: 'Giảng đường 1',  lat: 10.419465, lng: 105.643593, description: 'Giảng đường lớn dành cho các lớp học tập trung.' },
+          { id: 'hall-2',   name: 'Nhà A2',         lat: 10.419833, lng: 105.643778, description: 'Giảng đường lớn dành cho các lớp học tập trung.' },
           { id: 'library',  name: 'Thư viện',       lat: 10.421060, lng: 105.643770, description: 'Thư viện trường, mở cửa từ 7:30 - 20:00.' },
           { id: 'dorm',     name: 'Ký túc xá',      lat: 10.421669, lng: 105.643866, description: 'Ký túc xá sinh viên.' },
           { id: 'hieubo',   name: 'Hiệu bộ',        lat: 10.420409, lng: 105.642938, description: 'Hiệu bộ trường Đại học Đồng Tháp.' },
           { id: 'parkingB', name: 'Nhà xe cổng B',  lat: 10.421197, lng: 105.643890, description: 'Khu vực gửi xe cho sinh viên và cán bộ.' },
           { id: 'parkingC', name: 'Nhà xe cổng C',  lat: 10.421073, lng: 105.642450, description: 'Khu vực gửi xe cho sinh viên và cán bộ.' },
           { id: 'school',   name: 'Trường mẫu giáo', lat: 10.418921, lng: 105.644955, description: 'Trường mẫu giáo dành cho con em cán bộ và sinh viên.' },
-          { id: 'pool',     name: 'Hồ bơi',          lat: 10.422321, lng: 105.640886, description: 'Hồ bơi' }
+          { id: 'pool',     name: 'Hồ bơi',          lat: 10.422321, lng: 105.640886, description: 'Hồ bơi' },
+          { id: 'laodong',     name: 'Đăng kí lao động',          lat: 10.421582,lng: 105.644240, description: 'Lao động' }
     ];
 
     campusPOIs.forEach(p => {

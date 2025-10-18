@@ -54,3 +54,4 @@ def api_contact(request):
         print("❌ Lỗi gửi mail:", e)
         traceback.print_exc()
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+    

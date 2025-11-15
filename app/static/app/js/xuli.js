@@ -1,3 +1,28 @@
+// Đa giác các tòa nhà chính (ví dụ, Thư viện, B3, B4...)
+const POLYGON_OBSTACLES = [
+  // Thư viện
+  [
+    [10.42113, 105.64367],
+    [10.42113, 105.64385],
+    [10.42099, 105.64385],
+    [10.42099, 105.64367],
+  ],
+  // Nhà B3 (ví dụ, cần chỉnh lại theo thực tế)
+  [
+    [10.42116, 105.64298],
+    [10.42116, 105.64307],
+    [10.42105, 105.64307],
+    [10.42105, 105.64298],
+  ],
+  // Nhà xe cổng B
+  [
+    [10.42123, 105.64385],
+    [10.42123, 105.64393],
+    [10.42116, 105.64393],
+    [10.42116, 105.64385],
+  ],
+  // Thêm các polygon khác nếu cần...
+];
 /**
  * xuli.js – Bản đồ + Geocode + Tìm đường (OSRM)
  * - Khởi tạo Leaflet (OSM tile), polygon khuôn viên, POIs và overlay thông tin.
@@ -113,9 +138,9 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- ĐƯỜNG MINH HỌA (CUSTOM VISUAL PATHS) ---
     // Các polyline ví dụ mô phỏng đường đen trên map bạn gửi.
     // Mỗi phần là 1 đoạn đường; chỉnh tọa độ nếu cần để khớp chính xác.
-    CUSTOM_VISUAL_PATHS = [
+    /*CUSTOM_VISUAL_PATHS = [
       // 1) b2 xuống nhà a1 xuống gd 1
-      /*[
+      [
         [10.420755, 105.642961],
         [10.420067, 105.643586],
         [10.419661, 105.643571],
@@ -288,8 +313,9 @@ document.addEventListener("DOMContentLoaded", function () {
       [
         [10.420932, 105.644067],
         [10.420978, 105.64463],
-      ],*/
+      ],
     ];
+    */
 
     // Layer riêng cho đường minh họa (để dễ bật/tắt). Vẽ 2 lớp: nền đen dày + vạch trắng mảnh ở giữa.
     let customVisualLayer = null;
@@ -795,7 +821,11 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // Click map -> reverse geocode -> overlay
+    let lastMapClick = 0;
     map.on("click", async (e) => {
+      const now = Date.now();
+      if (now - lastMapClick < 400) return;
+      lastMapClick = now;
       try {
         const meta = await reverseGeocode(e.latlng.lat, e.latlng.lng);
         showPlaceInfo(e.latlng, meta);
@@ -1091,17 +1121,40 @@ document.addEventListener("DOMContentLoaded", function () {
       setLoading(true);
       setLoading(false, {
         onHidden: () => {
-          // Sau khi loader ẩn, hiển thị thông báo ở giữa màn hình
           showCenterNotice("Vui lòng chọn điểm xuất phát và điểm đến.", "warn");
         },
       });
       return;
     }
-
     try {
       setLoading(true);
       if (routeInfoEl) routeInfoEl.innerHTML = "⏳ Đang tìm đường...";
-      await computeAndRenderRoute();
+      // Lấy toạ độ xuất phát/kết thúc
+      const s = await resolveInputCoords(startEl);
+      const e = await resolveInputCoords(endEl);
+      // Chỉ dùng lối mòn/khoảng trống: ưu tiên Dijkstra trên CUSTOM_VISUAL_PATHS, nếu không có thì dùng A* grid tránh vật cản
+      let found = false;
+      // 1) Dijkstra trên CUSTOM_VISUAL_PATHS (nếu có)
+      if (typeof window.findAndDrawInternal === "function") {
+        window.findAndDrawInternal(
+          { lat: s[0], lng: s[1] },
+          { lat: e[0], lng: e[1] }
+        );
+        found = true;
+      } else {
+        // 2) fallback: A* grid tránh vật cản
+        const gridCoords = tryBeelineGridRoute(s, e);
+        if (Array.isArray(gridCoords) && gridCoords.length >= 2) {
+          drawManualRouteCoords(gridCoords);
+          found = true;
+        }
+      }
+      if (!found) {
+        showCenterNotice(
+          "Không tìm được đường đi phù hợp trong lối mòn/khoảng trống!",
+          "error"
+        );
+      }
     } catch (err) {
       alert(err.message || "Đã xảy ra lỗi");
     } finally {
@@ -1683,13 +1736,14 @@ document.addEventListener("DOMContentLoaded", function () {
   // Kiểm tra điểm có trong polygon (ray casting)
   function pointInPolygon([lat, lng], polygonLayer) {
     if (!polygonLayer) return false;
-    const poly = polygonLayer.getLatLngs()[0]; // ring đầu tiên
+    // polygonLayer là mảng [lat, lng]
+    const poly = polygonLayer;
     let inside = false;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const xi = poly[i].lat,
-        yi = poly[i].lng;
-      const xj = poly[j].lat,
-        yj = poly[j].lng;
+      const xi = poly[i][0],
+        yi = poly[i][1];
+      const xj = poly[j][0],
+        yj = poly[j][1];
       const intersect =
         yi > lng !== yj > lng &&
         lat < ((xj - xi) * (lng - yi)) / (yj - yi + 1e-12) + xi;
@@ -2179,35 +2233,35 @@ document.addEventListener("DOMContentLoaded", function () {
   // ==== Beeline A* trên lưới tránh vật cản (đi theo khoảng trống như bạn vẽ) ====
   function getCampusObstacles() {
     const items = [
-      ["Tòa B1", 10.420717, 105.642506, 18],
-      ["Tòa B2", 10.420904, 105.642823, 18],
-      ["Tòa B3", 10.421105, 105.643024, 18],
-      ["Tòa B4", 10.421303, 105.643228, 20],
-      ["Tòa B5", 10.421485, 105.643474, 22],
-      ["Tòa C1", 10.421712, 105.641854, 22],
-      ["Tòa C2", 10.42212, 105.641495, 22],
-      ["Tòa A1", 10.420419, 105.643402, 18],
-      ["Tòa A4", 10.420327, 105.643968, 18],
-      ["Tòa A7", 10.419032, 105.643874, 18],
-      ["Tòa A8", 10.419274, 105.644832, 18],
-      ["Tòa A9", 10.418984, 105.644384, 18],
-      ["Tòa T1", 10.41976, 105.644797, 18],
-      ["Tòa T3", 10.419385, 105.64506, 18],
-      ["Tòa H1", 10.420601, 105.643611, 18],
-      ["Tòa H2", 10.419686, 105.644293, 18],
-      ["Tòa H3", 10.420142, 105.644641, 18],
-      ["Nhà thi đấu đa năng", 10.421258, 105.642284, 36],
-      ["Thư viện", 10.42106, 105.64377, 22],
-      ["Ký túc xá", 10.421669, 105.643866, 22],
-      ["Hiệu bộ", 10.420409, 105.642938, 18],
-      ["Nhà xe cổng B", 10.421197, 105.64389, 16],
-      ["Nhà xe cổng C", 10.421073, 105.64245, 16],
-      ["Sân pickleball", 10.421511, 105.642616, 14],
-      ["Sân basketball", 10.421696, 105.642917, 16],
-      ["NoDiag1", 10.4212, 105.6427, 10],
-      ["NoDiag2", 10.4213, 105.64293, 10],
-      ["NoDiag3", 10.42141, 105.64318, 10],
-      ["NoDiag4", 10.42148, 105.64333, 10],
+      ["Tòa B1", 10.420717, 105.642506, 24],
+      ["Tòa B2", 10.420904, 105.642823, 24],
+      ["Tòa B3", 10.421105, 105.643024, 28],
+      ["Tòa B4", 10.421303, 105.643228, 26],
+      ["Tòa B5", 10.421485, 105.643474, 26],
+      ["Tòa C1", 10.421712, 105.641854, 26],
+      ["Tòa C2", 10.42212, 105.641495, 26],
+      ["Tòa A1", 10.420419, 105.643402, 24],
+      ["Tòa A4", 10.420327, 105.643968, 24],
+      ["Tòa A7", 10.419032, 105.643874, 24],
+      ["Tòa A8", 10.419274, 105.644832, 24],
+      ["Tòa A9", 10.418984, 105.644384, 24],
+      ["Tòa T1", 10.41976, 105.644797, 24],
+      ["Tòa T3", 10.419385, 105.64506, 24],
+      ["Tòa H1", 10.420601, 105.643611, 24],
+      ["Tòa H2", 10.419686, 105.644293, 24],
+      ["Tòa H3", 10.420142, 105.644641, 24],
+      ["Nhà thi đấu đa năng", 10.421258, 105.642284, 40],
+      ["Thư viện", 10.42106, 105.64377, 28],
+      ["Ký túc xá", 10.421669, 105.643866, 28],
+      ["Hiệu bộ", 10.420409, 105.642938, 24],
+      ["Nhà xe cổng B", 10.421197, 105.64389, 20],
+      ["Nhà xe cổng C", 10.421073, 105.64245, 20],
+      ["Sân pickleball", 10.421511, 105.642616, 18],
+      ["Sân basketball", 10.421696, 105.642917, 20],
+      ["NoDiag1", 10.4212, 105.6427, 12],
+      ["NoDiag2", 10.4213, 105.64293, 12],
+      ["NoDiag3", 10.42141, 105.64318, 12],
+      ["NoDiag4", 10.42148, 105.64333, 12],
     ];
     return items.map((x) => ({ name: x[0], lat: x[1], lng: x[2], r: x[3] }));
   }
@@ -2296,6 +2350,20 @@ document.addEventListener("DOMContentLoaded", function () {
     for (let iy = 0; iy < h; iy++) {
       for (let ix = 0; ix < w; ix++) {
         const c = cellCenter(ix, iy);
+        // Chuyển về lat/lng để kiểm tra polygon
+        const ll = unproject(lat0, lng0, c.x, c.y);
+        let inPoly = false;
+        for (const poly of POLYGON_OBSTACLES) {
+          if (pointInPolygon([ll.lat, ll.lng], poly)) {
+            inPoly = true;
+            break;
+          }
+        }
+        if (inPoly) {
+          block[idx(ix, iy)] = 1;
+          continue;
+        }
+        // Vẫn kiểm tra vật cản hình tròn (cũ)
         for (const o of obs) {
           const po = project(lat0, lng0, o.lat, o.lng);
           const d = Math.hypot(c.x - po.x, c.y - po.y);

@@ -1,27 +1,35 @@
-// Đa giác các tòa nhà chính (ví dụ, Thư viện, B3, B4...)
+// =========================
+// POLYGON_OBSTACLES: Danh sách các đa giác (polygon) đại diện cho các tòa nhà/vật cản trên bản đồ
+// Mỗi phần tử là một mảng các điểm [vĩ độ, kinh độ] tạo thành một đa giác khép kín
+// Dùng để vẽ lên bản đồ, tránh khi tìm đường, hoặc hiển thị trực quan các khu vực không đi qua được
+// =========================
 const POLYGON_OBSTACLES = [
-  // Thư viện
+  // --- Đa giác 1: Thư viện ---
+  // Bốn điểm tạo thành hình chữ nhật quanh tòa nhà Thư viện
   [
-    [10.42113, 105.64367],
-    [10.42113, 105.64385],
-    [10.42099, 105.64385],
-    [10.42099, 105.64367],
+    [10.42113, 105.64367], // Góc 1 của Thư viện
+    [10.42113, 105.64385], // Góc 2 của Thư viện
+    [10.42099, 105.64385], // Góc 3 của Thư viện
+    [10.42099, 105.64367], // Góc 4 của Thư viện
   ],
-  // Nhà B3 (ví dụ, cần chỉnh lại theo thực tế)
+  // --- Đa giác 2: Nhà B3 ---
+  // Bốn điểm tạo thành hình chữ nhật quanh nhà B3 (cần chỉnh lại nếu tọa độ thực tế khác)
   [
-    [10.42116, 105.64298],
-    [10.42116, 105.64307],
-    [10.42105, 105.64307],
-    [10.42105, 105.64298],
+    [10.42116, 105.64298], // Góc 1 của nhà B3
+    [10.42116, 105.64307], // Góc 2 của nhà B3
+    [10.42105, 105.64307], // Góc 3 của nhà B3
+    [10.42105, 105.64298], // Góc 4 của nhà B3
   ],
-  // Nhà xe cổng B
+  // --- Đa giác 3: Nhà xe cổng B ---
+  // Bốn điểm tạo thành hình chữ nhật quanh khu vực nhà xe gần cổng B
   [
-    [10.42123, 105.64385],
-    [10.42123, 105.64393],
-    [10.42116, 105.64393],
-    [10.42116, 105.64385],
+    [10.42123, 105.64385], // Góc 1 nhà xe cổng B
+    [10.42123, 105.64393], // Góc 2 nhà xe cổng B
+    [10.42116, 105.64393], // Góc 3 nhà xe cổng B
+    [10.42116, 105.64385], // Góc 4 nhà xe cổng B
   ],
-  // Thêm các polygon khác nếu cần...
+  // --- Thêm các polygon khác nếu cần ---
+  // Để thêm tòa nhà/vật cản mới, chỉ cần thêm một mảng các điểm [lat, lng] vào đây
 ];
 /**
  * xuli.js – Bản đồ + Geocode + Tìm đường (OSRM)
@@ -31,76 +39,88 @@ const POLYGON_OBSTACLES = [
  */
 
 document.addEventListener("DOMContentLoaded", function () {
-  // ====== Phần tử giao diện ======
+  // ====== Lấy các phần tử giao diện (DOM elements) ======
+  // mapEl: phần tử chứa bản đồ
+  // startEl: ô nhập điểm xuất phát
+  // endEl: ô nhập điểm đến
+  // modeEl: chọn chế độ di chuyển (nếu có)
+  // routeInfoEl: hiển thị thông tin tuyến đường
+  // findBtn: nút tìm đường
+  // campusPlaceEl: chọn nhanh các địa điểm trong khuôn viên (tùy chọn)
+  // campusSetStartBtn, campusSetEndBtn: nút đặt làm điểm xuất phát/điểm đến từ danh sách campus (tùy chọn)
   const mapEl = document.getElementById("map");
   const startEl = document.getElementById("start");
   const endEl = document.getElementById("end");
-  const modeEl = document.getElementById("mode"); // nếu không có cũng không sao
+  const modeEl = document.getElementById("mode");
   const routeInfoEl = document.getElementById("route-info");
   const findBtn = document.querySelector(".form-nhap button");
-  const campusPlaceEl = document.getElementById("campus-place"); // tùy chọn
-  const campusSetStartBtn = document.getElementById("campus-set-start"); // tùy chọn
-  const campusSetEndBtn = document.getElementById("campus-set-end"); // tùy chọn
+  const campusPlaceEl = document.getElementById("campus-place");
+  const campusSetStartBtn = document.getElementById("campus-set-start");
+  const campusSetEndBtn = document.getElementById("campus-set-end");
 
-  // ====== Trạng thái runtime ======
+  // ====== Các biến trạng thái dùng trong runtime ======
+  // Lưu các marker, tuyến đường, polygon, trạng thái tìm đường, v.v.
 
-  let map,
-    startMarker,
-    endMarker,
-    routeLine,
-    highlightMarker,
-    campusPolygon,
-    campusPoiLayer;
-  let campusPathsLayer = null;
-  let inFlight = null;
-  let programmaticUpdate = false; // tránh gọi tìm đường lặp khi cập nhật marker bằng code
-  // Theo dõi vị trí người dùng khi di chuyển
-  let userWatchId = null;
-  let userLocationMarker = null;
-  let userAccuracyCircle = null;
-  let initializedStartFromWatch = false;
-  let prevUserLatLng = null; // lưu vị trí trước đó để suy ra hướng khi thiếu heading
-  let lastHeadingDeg = 0; // góc hướng gần nhất (độ)
+  let map, // đối tượng bản đồ Leaflet
+    startMarker, // marker điểm xuất phát
+    endMarker, // marker điểm đến
+    routeLine, // polyline tuyến đường
+    highlightMarker, // marker nổi bật khi chọn POI
+    campusPolygon, // polygon khuôn viên
+    campusPoiLayer; // layer các POI trong campus
+  let campusPathsLayer = null; // layer các đường đi trong campus
+  let inFlight = null; // trạng thái fetch đang chạy (dùng cho abort)
+  let programmaticUpdate = false; // true nếu cập nhật marker bằng code, tránh lặp tìm đường
+  // Các biến phục vụ định vị và theo dõi vị trí người dùng
+  let userWatchId = null; // id theo dõi vị trí (nếu dùng watchPosition)
+  let userLocationMarker = null; // marker vị trí hiện tại của user
+  let userAccuracyCircle = null; // vòng tròn thể hiện độ chính xác định vị
+  let initializedStartFromWatch = false; // đã khởi tạo marker từ định vị chưa
+  let prevUserLatLng = null; // vị trí trước đó (dùng tính hướng di chuyển)
+  let lastHeadingDeg = 0; // hướng di chuyển gần nhất (độ)
   let shownLowAccWarn = false; // đã cảnh báo độ chính xác thấp chưa
-  let lastAutoRouteLatLng = null; // vị trí lần gần nhất đã tự vẽ tuyến
-  let lastRouteSummary = null; // tóm tắt tuyến OSRM/manual gần nhất
+  let lastAutoRouteLatLng = null; // vị trí lần gần nhất đã tự động vẽ tuyến
+  let lastRouteSummary = null; // tóm tắt tuyến đường gần nhất
   let reachedDestination = false; // đã tới điểm đến chưa (để không báo nhiều lần)
-  // Loader state
+  // Loader state: phục vụ hiển thị loading khi tìm đường
   let loadingStartedAt = 0;
   let loadingHideTimer = null;
-  // Hoisted so routing (Dijkstra) can use custom visual paths as a graph
+  // CUSTOM_VISUAL_PATHS: các đường minh họa (polyline) vẽ thêm trên bản đồ
   CUSTOM_VISUAL_PATHS = [];
 
-  // Cấu hình cảnh báo độ chính xác thấp (tắt popup cảnh báo)
-  const GEO_WARN_LOW_ACCURACY = false;
-  const GEO_LOW_ACCURACY_THRESHOLD_M = 150;
+  // Cấu hình cảnh báo độ chính xác thấp khi định vị (có thể bật/tắt)
+  const GEO_WARN_LOW_ACCURACY = false; // true: bật cảnh báo, false: tắt
+  const GEO_LOW_ACCURACY_THRESHOLD_M = 150; // ngưỡng cảnh báo (mét)
 
-  // ====== Endpoints ======
+  // ====== Địa chỉ endpoint cho geocode/reverse geocode ======
+  // Sử dụng dịch vụ Nominatim (OpenStreetMap)
   const NOMINATIM_SEARCH = "https://nominatim.openstreetmap.org/search";
   const NOMINATIM_REVERSE = "https://nominatim.openstreetmap.org/reverse";
 
-  // ====== Khởi tạo ======
-  initMap();
-  attachEventHandlers();
+  // ====== Khởi tạo bản đồ và gắn sự kiện ======
+  initMap(); // Tạo bản đồ, các layer, polygon, tile nền, v.v.
+  attachEventHandlers(); // Gắn các sự kiện cho UI
 
-  // Xuất hàm để HTML gọi
+  // Xuất các hàm để có thể gọi từ HTML (onclick, v.v.)
   window.findRoute = guardedFindRoute;
   window.getCurrentLocation = getCurrentLocation;
   window.resetMap = resetMap;
 
-  // ====== Khởi tạo bản đồ ======
+  // ====== Hàm khởi tạo bản đồ (Leaflet) ======
+  // Tạo map, các layer, tile nền, polygon, các pane cho các lớp vẽ khác nhau
   function initMap() {
     map = L.map(mapEl, {
-      center: [10.4209, 105.6439], // tâm khuôn viên
-      zoom: 17,
-      minZoom: 18, // zoom nhỏ nhất cho phép
-      maxZoom: 20, // zoom lớn nhất cho phép
-      rotate: true, // cho phép xoay
-      touchRotate: true, // xoay bằng cảm ứng
-      attribution: "", // 👈 bỏ nội dung attribution
+      center: [10.420921, 105.643558], // Tâm bản đồ rộng hơn, dịch ra ngoài một chút để nhìn tổng thể hơn
+      zoom: 18, // Mức zoom mặc định
+      minZoom: 17, // Zoom nhỏ nhất cho phép (giới hạn không cho zoom quá xa)
+      maxZoom: 19, // Zoom lớn nhất cho phép
+      rotate: true, // Cho phép xoay bản đồ
+      touchRotate: true, // Cho phép xoay bằng cảm ứng
+      attribution: "", // Bỏ attribution mặc định của Leaflet
     });
-    map.attributionControl.setPrefix(false); // bỏ chữ "Leaflet"
+    map.attributionControl.setPrefix(false); // Bỏ chữ "Leaflet" ở góc bản đồ
     try {
+      // Tạo các pane riêng cho từng lớp vẽ (giúp kiểm soát thứ tự hiển thị)
       map.createPane("groundPane");
       map.getPane("groundPane").style.zIndex = 400;
       map.createPane("visualBasePane");
@@ -115,14 +135,15 @@ document.addEventListener("DOMContentLoaded", function () {
       map.getPane("labelPane").style.zIndex = 700; // nhãn luôn trên cùng
     } catch (e) {}
 
+    // Mở rộng giới hạn bản đồ để cho phép xem rộng hơn khuôn viên trường
     const bounds = [
-      [10.418, 105.6405],
-      [10.423, 105.646],
+      [10.424125, 105.638641], // Góc dưới trái (rộng hơn)
+      [10.417701, 105.647316], // Góc trên phải (rộng hơn)
+      
     ];
     map.setMaxBounds(bounds);
-    // dính chặt biên, không kéo ra ngoài
 
-    // Lớp nền OSM
+    // Thêm lớp nền bản đồ (OpenStreetMap, style sáng, không nhãn)
     L.tileLayer(
       "https://cartodb-basemaps-a.global.ssl.fastly.net/light_nolabels/{z}/{x}/{y}{r}.png",
       {
@@ -1132,28 +1153,54 @@ document.addEventListener("DOMContentLoaded", function () {
       // Lấy toạ độ xuất phát/kết thúc
       const s = await resolveInputCoords(startEl);
       const e = await resolveInputCoords(endEl);
-      // Chỉ dùng lối mòn/khoảng trống: ưu tiên Dijkstra trên CUSTOM_VISUAL_PATHS, nếu không có thì dùng A* grid tránh vật cản
       let found = false;
-      // 1) Dijkstra trên CUSTOM_VISUAL_PATHS (nếu có)
-      if (typeof window.findAndDrawInternal === "function") {
-        window.findAndDrawInternal(
-          { lat: s[0], lng: s[1] },
-          { lat: e[0], lng: e[1] }
-        );
+      // Nếu điểm xuất phát ngoài campus, chỉ vẽ đường thẳng
+      if (!isNearCampus(s[0], s[1], 1500)) {
+        // Xóa mọi tuyến cũ
+        if (routeLine) removeLayerIfExists(routeLine);
+        routeLine = null;
+        // Vẽ đường thẳng từ s đến e
+        routeLine = L.polyline(
+          [
+            [s[0], s[1]],
+            [e[0], e[1]],
+          ],
+          {
+            color: "#8b5cf6",
+            weight: 5,
+            opacity: 0.85,
+            dashArray: "8,8",
+          }
+        ).addTo(map);
         found = true;
-      } else {
-        // 2) fallback: A* grid tránh vật cản
-        const gridCoords = tryBeelineGridRoute(s, e);
-        if (Array.isArray(gridCoords) && gridCoords.length >= 2) {
-          drawManualRouteCoords(gridCoords);
-          found = true;
-        }
-      }
-      if (!found) {
+        if (routeInfoEl)
+          routeInfoEl.innerHTML =
+            '<div style="color:#f59e42"><b>Bạn đang ở ngoài khu vực campus, chỉ hiển thị đường thẳng tới điểm đến.</b></div>';
         showCenterNotice(
-          "Không tìm được đường đi phù hợp trong lối mòn/khoảng trống!",
-          "error"
+          "Bạn đang ở ngoài khu vực campus, chỉ hiển thị đường thẳng tới điểm đến.",
+          "warn"
         );
+      } else {
+        // Trong campus: giữ logic cũ
+        if (typeof window.findAndDrawInternal === "function") {
+          window.findAndDrawInternal(
+            { lat: s[0], lng: s[1] },
+            { lat: e[0], lng: e[1] }
+          );
+          found = true;
+        } else {
+          const gridCoords = tryBeelineGridRoute(s, e);
+          if (Array.isArray(gridCoords) && gridCoords.length >= 2) {
+            drawManualRouteCoords(gridCoords);
+            found = true;
+          }
+        }
+        if (!found) {
+          showCenterNotice(
+            "Không tìm được đường đi phù hợp trong lối mòn/khoảng trống!",
+            "error"
+          );
+        }
       }
     } catch (err) {
       alert(err.message || "Đã xảy ra lỗi");
@@ -1425,41 +1472,13 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch {}
     }
 
-    // Nếu đang theo dõi -> dừng
-    if (userWatchId !== null) {
-      try {
-        navigator.geolocation.clearWatch(userWatchId);
-      } catch {}
-      userWatchId = null;
-      initializedStartFromWatch = false;
-      prevUserLatLng = null;
-      lastHeadingDeg = 0;
-      shownLowAccWarn = false;
-      if (userLocationMarker) {
-        removeLayerIfExists(userLocationMarker);
-        userLocationMarker = null;
-      }
-      if (userAccuracyCircle) {
-        removeLayerIfExists(userAccuracyCircle);
-        userAccuracyCircle = null;
-      }
-      if (geoBtn) {
-        if (!geoBtn.dataset.originalText)
-          geoBtn.dataset.originalText =
-            '<i class="fa-solid fa-location-crosshairs"></i> Lấy vị trí ';
-        geoBtn.innerHTML = geoBtn.dataset.originalText;
-      }
-      // stop blinking when tracking stopped
-      if (typeof window.stopTrackingBlink === "function")
-        window.stopTrackingBlink();
-      return;
-    }
-
-    // Bắt đầu theo dõi
+    // Lấy vị trí một lần và đặt làm điểm xuất phát
     if (geoBtn && !geoBtn.dataset.originalText) {
       geoBtn.dataset.originalText = geoBtn.innerHTML;
     }
-    userWatchId = navigator.geolocation.watchPosition(
+    if (typeof window.startTrackingBlink === "function")
+      window.startTrackingBlink();
+    navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
@@ -1467,54 +1486,19 @@ document.addEventListener("DOMContentLoaded", function () {
           typeof pos.coords.accuracy === "number"
             ? pos.coords.accuracy
             : Infinity;
-
         const ll = L.latLng(lat, lng);
-
-        // Bỏ qua fix quá kém khi khởi tạo lần đầu, đợi fix tốt hơn (nới lỏng ngưỡng)
-        if (!initializedStartFromWatch && acc > 2000) {
-          return;
+        // Nếu ngoài phạm vi campus, cảnh báo nhưng vẫn đặt marker và zoom tới
+        if (!isNearCampus(lat, lng, 1500)) {
+          showCenterNotice("Bạn đang ở ngoài khu vực bản đồ!", "warn");
         }
-        if (prevUserLatLng && acc > 2000) {
-          const dist = distanceMeters(prevUserLatLng, ll);
-          if (dist > 2000) return;
-        }
-
-        if (
-          GEO_WARN_LOW_ACCURACY &&
-          !shownLowAccWarn &&
-          acc > GEO_LOW_ACCURACY_THRESHOLD_M &&
-          acc < Infinity
-        ) {
-          shownLowAccWarn = true;
-          try {
-            showCenterNotice(
-              `Độ chính xác định vị thấp (~${Math.round(
-                acc
-              )} m). Đang đợi tín hiệu tốt hơn...`,
-              "warn"
-            );
-          } catch {}
-        }
-
-        let hdg =
-          typeof pos.coords.heading === "number" && !isNaN(pos.coords.heading)
-            ? pos.coords.heading
-            : null;
-        if ((hdg == null || isNaN(hdg)) && prevUserLatLng) {
-          const b = computeBearing(prevUserLatLng, ll);
-          if (b != null && !isNaN(b)) hdg = b;
-        }
-        if (typeof hdg === "number" && !isNaN(hdg)) lastHeadingDeg = hdg;
-
+        // Hiển thị marker vị trí hiện tại
         if (!userLocationMarker) {
           userLocationMarker = L.marker(ll, {
-            icon: buildUserHeadingIcon(lastHeadingDeg),
+            icon: buildUserHeadingIcon(0),
           }).addTo(map);
         } else {
           userLocationMarker.setLatLng(ll);
-          userLocationMarker.setIcon(buildUserHeadingIcon(lastHeadingDeg));
         }
-
         if (!userAccuracyCircle) {
           userAccuracyCircle = L.circle(ll, {
             radius: acc,
@@ -1527,75 +1511,22 @@ document.addEventListener("DOMContentLoaded", function () {
           userAccuracyCircle.setLatLng(ll);
           userAccuracyCircle.setRadius(acc);
         }
-
-        prevUserLatLng = ll;
-
-        if (!initializedStartFromWatch) {
-          const hadEnd = !!(
-            endEl &&
-            endEl.value &&
-            endEl.value.trim().length > 0
-          );
-          programmaticUpdate = true;
-          setAsStart({ lat, lng }, `${lat.toFixed(6)},${lng.toFixed(6)}`);
-          programmaticUpdate = false;
-          map.setView(ll, Math.max(map.getZoom(), 15));
-          initializedStartFromWatch = true;
-          // Khởi động nháy khi có fix đầu tiên
-          if (typeof window.startTrackingBlink === "function")
-            window.startTrackingBlink();
-          // Nếu đã có điểm đến, tự động tìm và vẽ đường (xuất phát = vị trí hiện tại)
-          if (hadEnd && hasBothInputs()) {
-            try {
-              guardedFindRoute();
-            } catch {}
-            lastAutoRouteLatLng = ll;
-          }
-        } else {
-          // Khi đang theo dõi: nếu đã có điểm đến -> tự cập nhật start và vẽ lại khi di chuyển đủ xa
-          const hadEnd = !!(
-            endEl &&
-            endEl.value &&
-            endEl.value.trim().length > 0
-          );
-          if (hadEnd) {
-            programmaticUpdate = true;
-            setAsStart({ lat, lng }, `${lat.toFixed(6)},${lng.toFixed(6)}`);
-            programmaticUpdate = false;
-            const moved = lastAutoRouteLatLng
-              ? distanceMeters(lastAutoRouteLatLng, ll)
-              : Infinity;
-            if (moved > 20) {
-              lastAutoRouteLatLng = ll;
-              if (hasBothInputs()) debouncedFindRoute();
-            }
-          }
+        // Đặt làm điểm xuất phát
+        programmaticUpdate = true;
+        setAsStart({ lat, lng }, `${lat.toFixed(6)},${lng.toFixed(6)}`);
+        programmaticUpdate = false;
+        map.setView(ll, Math.max(map.getZoom(), 15));
+        initializedStartFromWatch = true;
+        if (hasBothInputs()) {
+          try {
+            guardedFindRoute();
+          } catch {}
+          lastAutoRouteLatLng = ll;
         }
-
-        // Cập nhật khoảng cách còn lại và phát hiện đã đến nơi
-        try {
-          const dlat = parseFloat(endEl?.dataset?.lat);
-          const dlng = parseFloat(endEl?.dataset?.lng);
-          if (!Number.isNaN(dlat) && !Number.isNaN(dlng)) {
-            const dest = L.latLng(dlat, dlng);
-            const rem = distanceMeters(ll, dest);
-            renderProgress(rem);
-            if (!reachedDestination && rem <= ARRIVAL_THRESHOLD_M) {
-              reachedDestination = true;
-              try {
-                if (navigator.vibrate) navigator.vibrate([120, 80, 120]);
-              } catch {}
-              showCenterNotice("Bạn đã tới điểm đến.", "success");
-              try {
-                navigator.geolocation.clearWatch(userWatchId);
-              } catch {}
-              userWatchId = null;
-              initializedStartFromWatch = false;
-              if (typeof window.stopTrackingBlink === "function")
-                window.stopTrackingBlink();
-            }
-          }
-        } catch {}
+        if (geoBtn && geoBtn.dataset.originalText)
+          geoBtn.innerHTML = geoBtn.dataset.originalText;
+        if (typeof window.stopTrackingBlink === "function")
+          window.stopTrackingBlink();
       },
       (err) => {
         console.warn(err);
@@ -1606,17 +1537,11 @@ document.addEventListener("DOMContentLoaded", function () {
         );
         if (geoBtn && geoBtn.dataset.originalText)
           geoBtn.innerHTML = geoBtn.dataset.originalText;
-        userWatchId = null;
-        // stop blinking on error
         if (typeof window.stopTrackingBlink === "function")
           window.stopTrackingBlink();
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     );
-
-    // Bắt đầu nháy ngay khi bật theo dõi để báo đang lấy vị trí; sẽ dừng khi lỗi/nguời dùng tắt.
-    if (typeof window.startTrackingBlink === "function")
-      window.startTrackingBlink();
   }
 
   // Overlay thông tin địa điểm
@@ -2940,12 +2865,16 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
-// ======= Smart campus routing (uses CUSTOM_VISUAL_PATHS as graph) =======
-// Build a graph from CUSTOM_VISUAL_PATHS: nodes are unique coordinates, edges weighted by distance.
+// ======= Định tuyến thông minh trong khuôn viên (dùng CUSTOM_VISUAL_PATHS làm đồ thị) =======
+
+// Xây dựng đồ thị từ CUSTOM_VISUAL_PATHS: mỗi node là một toạ độ duy nhất, cạnh có trọng số là khoảng cách mét
 function buildCampusGraph() {
-  const nodes = []; // array of {lat,lng}
+  // Danh sách node, mỗi node là {lat, lng}
+  const nodes = [];
+  // Hàm tạo key duy nhất cho mỗi toạ độ (làm tròn 6 chữ số thập phân)
   const keyOf = (p) => p[0].toFixed(6) + "," + p[1].toFixed(6);
   const idxMap = new Map();
+  // Thêm node mới nếu chưa có, trả về id node
   const addNode = (p) => {
     const k = keyOf(p);
     if (idxMap.has(k)) return idxMap.get(k);
@@ -2954,11 +2883,14 @@ function buildCampusGraph() {
     idxMap.set(k, id);
     return id;
   };
-  const edges = {}; // id -> [{to, w, pts: [p0,p1]}]
+  // edges: id -> [{to, w, pts: [p0,p1]}], lưu cạnh và trọng số (w = mét)
+  const edges = {};
+  // Thêm cạnh hai chiều giữa hai node
   const pushEdge = (a, b, w, pts) => {
     edges[a] = edges[a] || [];
     edges[a].push({ to: b, w: w, pts });
   };
+  // Tính khoảng cách mét giữa hai điểm lat/lng
   const meters = (a, b) => {
     const R = 6371000;
     const toRad = (x) => (x * Math.PI) / 180;
@@ -2971,6 +2903,7 @@ function buildCampusGraph() {
       Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
   };
+  // Duyệt qua từng đoạn đường trong CUSTOM_VISUAL_PATHS để thêm node và cạnh
   (CUSTOM_VISUAL_PATHS || []).forEach((seg) => {
     for (let i = 0; i < seg.length - 1; i++) {
       const a = seg[i],
@@ -2985,11 +2918,12 @@ function buildCampusGraph() {
   return { nodes, edges, idxMap };
 }
 
-// Find nearest graph node index to an arbitrary latlng
+// Tìm node gần nhất trong đồ thị với một toạ độ bất kỳ
 function nearestGraphNode(graph, latlng) {
   let best = -1,
     bestD = Infinity;
   graph.nodes.forEach((n, i) => {
+    // Dùng khoảng cách Euclid (tương đối nhanh, đủ chính xác cho campus nhỏ)
     const d = Math.hypot(n.lat - latlng.lat, n.lng - latlng.lng);
     if (d < bestD) {
       bestD = d;
@@ -2999,12 +2933,12 @@ function nearestGraphNode(graph, latlng) {
   return best;
 }
 
-// Simple Dijkstra
+// Thuật toán Dijkstra đơn giản để tìm đường ngắn nhất giữa hai node trong đồ thị
 function dijkstra(graph, sourceIdx, targetIdx) {
   const N = graph.nodes.length;
-  const dist = new Array(N).fill(Infinity);
-  const prev = new Array(N).fill(-1);
-  const vis = new Array(N).fill(false);
+  const dist = new Array(N).fill(Infinity); // Khoảng cách ngắn nhất từ source
+  const prev = new Array(N).fill(-1); // Lưu node trước đó trên đường đi
+  const vis = new Array(N).fill(false); // Đánh dấu đã thăm
   dist[sourceIdx] = 0;
   for (let iter = 0; iter < N; iter++) {
     let u = -1,
@@ -3014,9 +2948,9 @@ function dijkstra(graph, sourceIdx, targetIdx) {
         best = dist[i];
         u = i;
       }
-    if (u === -1) break;
+    if (u === -1) break; // Không còn node nào để duyệt
     vis[u] = true;
-    if (u === targetIdx) break;
+    if (u === targetIdx) break; // Đã đến đích
     const adj = graph.edges[u] || [];
     for (const e of adj) {
       const v = e.to;
@@ -3027,20 +2961,20 @@ function dijkstra(graph, sourceIdx, targetIdx) {
       }
     }
   }
-  if (!isFinite(dist[targetIdx])) return null;
+  if (!isFinite(dist[targetIdx])) return null; // Không tìm được đường đi
   const path = [];
   for (let u = targetIdx; u != -1; u = prev[u]) path.push(u);
   path.reverse();
   return path;
 }
 
-// Convert a graph path to an array of latlng points (interpolated by stored edge pts)
+// Chuyển một đường đi (danh sách chỉ số node) thành mảng toạ độ lat/lng (nối các đoạn)
 function graphPathToLatLngs(graph, path) {
   const pts = [];
   for (let k = 0; k < path.length - 1; k++) {
     const u = path[k],
       v = path[k + 1];
-    // find edge u->v
+    // Tìm cạnh u->v để lấy toạ độ chi tiết
     const arr = graph.edges[u] || [];
     let edge = arr.find((e) => e.to === v);
     if (edge && edge.pts) {
@@ -3049,26 +2983,27 @@ function graphPathToLatLngs(graph, path) {
         pts[pts.length - 1][0] === edge.pts[0][0] &&
         pts[pts.length - 1][1] === edge.pts[0][1]
       ) {
-        // append without repeating
+        // Nếu điểm đầu trùng, chỉ thêm điểm cuối
         pts.push([edge.pts[1][0], edge.pts[1][1]]);
       } else {
+        // Thêm cả hai điểm
         pts.push([edge.pts[0][0], edge.pts[0][1]]);
         pts.push([edge.pts[1][0], edge.pts[1][1]]);
       }
     } else {
-      // fallback: push nodes
+      // Nếu không có cạnh chi tiết, chỉ lấy node
       pts.push([graph.nodes[u].lat, graph.nodes[u].lng]);
       pts.push([graph.nodes[v].lat, graph.nodes[v].lng]);
     }
   }
-  // remove consecutive duplicates
+  // Loại bỏ các điểm trùng liên tiếp
   const clean = pts.filter(
     (p, i) => i === 0 || !(p[0] === pts[i - 1][0] && p[1] === pts[i - 1][1])
   );
   return clean;
 }
 
-// Check if latlng inside campus bounds (using map bounds as campus proxy)
+// Kiểm tra một toạ độ có nằm trong khuôn viên không (dùng maxBounds của map làm proxy)
 function pointInCampus(latlng) {
   if (!map) return false;
   const b = map.options.maxBounds;
@@ -3083,10 +3018,10 @@ function pointInCampus(latlng) {
   );
 }
 
-// Draw campus-only path using graph Dijkstra
+// Vẽ đường đi chỉ trong khuôn viên bằng Dijkstra trên đồ thị campus
 function drawCampusPath(startLatLng, endLatLng) {
+  // Nếu không có dữ liệu đường campus thì fallback sang OSRM
   if (!CUSTOM_VISUAL_PATHS || !CUSTOM_VISUAL_PATHS.length) {
-    // fallback to computeAndRenderRoute if no campus paths
     return computeAndRenderRoute(
       startLatLng.lat,
       startLatLng.lng,
@@ -3094,6 +3029,7 @@ function drawCampusPath(startLatLng, endLatLng) {
       endLatLng.lng
     );
   }
+  // Xây đồ thị và tìm node gần nhất với điểm đầu/cuối
   const graph = buildCampusGraph();
   const sIdx = nearestGraphNode(graph, startLatLng);
   const eIdx = nearestGraphNode(graph, endLatLng);
@@ -3105,6 +3041,7 @@ function drawCampusPath(startLatLng, endLatLng) {
       endLatLng.lng
     );
 
+  // Tìm đường đi ngắn nhất
   const pathIdx = dijkstra(graph, sIdx, eIdx);
   if (!pathIdx)
     return computeAndRenderRoute(
@@ -3114,9 +3051,10 @@ function drawCampusPath(startLatLng, endLatLng) {
       endLatLng.lng
     );
 
+  // Chuyển đường đi thành mảng toạ độ
   const latlngs = graphPathToLatLngs(graph, pathIdx);
 
-  // prepend actual start and append actual end if they are off-node
+  // Nếu điểm đầu/cuối không trùng node thì thêm vào đầu/cuối
   if (
     latlngs.length &&
     (latlngs[0][0] !== startLatLng.lat || latlngs[0][1] !== startLatLng.lng)
@@ -3131,6 +3069,7 @@ function drawCampusPath(startLatLng, endLatLng) {
     latlngs.push([endLatLng.lat, endLatLng.lng]);
   }
 
+  // Vẽ polyline lên bản đồ
   if (routeLine) removeLayerIfExists(routeLine);
   routeLine = L.polyline(latlngs, {
     color: "#16a34a",
@@ -3141,14 +3080,15 @@ function drawCampusPath(startLatLng, endLatLng) {
   renderRouteInfo({ distance: null, duration: null });
 }
 
-// Draw mixed campus + OSRM path. Strategy:
-// - If start in campus and end outside: connect start -> nearest campus node -> nearest campus exit (node near boundary)
-// - call OSRM from exit to outside point; then stitch back to internal path.
+// Vẽ đường đi kết hợp campus + ngoài khuôn viên (OSRM)
+// Chiến lược:
+// - Nếu điểm đầu trong campus, điểm cuối ngoài campus: nối start -> node gần biên campus -> node exit campus
+// - Gọi OSRM từ node exit đến điểm ngoài, sau đó ghép lại với đường nội bộ
 async function drawMixedPath(startLatLng, endLatLng) {
   try {
     const graph = buildCampusGraph();
     const sIdx = nearestGraphNode(graph, startLatLng);
-    // choose exit node as nearest node to campus boundary (heuristic: nearest to map center edges)
+    // Chọn node exit gần biên campus nhất (heuristic: gần tâm bản đồ)
     const exitIdx = (() => {
       let best = -1,
         bestD = Infinity;
@@ -3162,16 +3102,16 @@ async function drawMixedPath(startLatLng, endLatLng) {
       });
       return best;
     })();
-    // if end inside campus -> just campus path
+    // Nếu điểm cuối vẫn trong campus thì chỉ vẽ campus
     if (pointInCampus(endLatLng)) return drawCampusPath(startLatLng, endLatLng);
 
-    // compute internal from start -> exit
+    // Tính đường nội bộ từ start -> exit
     const pathIdx = dijkstra(graph, sIdx, exitIdx);
     const internalLatLngs = pathIdx
       ? graphPathToLatLngs(graph, pathIdx)
       : [[startLatLng.lat, startLatLng.lng]];
 
-    // call OSRM from exit node to external destination
+    // Gọi OSRM từ node exit đến điểm ngoài
     const exitNode = graph.nodes[exitIdx];
     const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${exitNode.lng},${exitNode.lat};${endLatLng.lng},${endLatLng.lat}?overview=full&geometries=geojson`;
     const res = await fetch(osrmUrl);
@@ -3183,6 +3123,7 @@ async function drawMixedPath(startLatLng, endLatLng) {
       c[0],
     ]);
 
+    // Ghép đường nội bộ và đường ngoài lại
     const stitched = internalLatLngs.concat(extCoords);
     if (routeLine) removeLayerIfExists(routeLine);
     routeLine = L.polyline(stitched, {
@@ -3197,7 +3138,7 @@ async function drawMixedPath(startLatLng, endLatLng) {
     });
   } catch (e) {
     console.warn("drawMixedPath error", e);
-    // fallback to plain OSRM
+    // Nếu lỗi thì fallback sang OSRM thường
     return computeAndRenderRoute(
       startLatLng.lat,
       startLatLng.lng,
@@ -3207,10 +3148,10 @@ async function drawMixedPath(startLatLng, endLatLng) {
   }
 }
 
-// Public smart route entry: accepts start/end as {lat,lng} or reads from inputs
+// Hàm tìm đường thông minh: nhận start/end là {lat, lng} hoặc đọc từ input
 async function findSmartRoute(start, end) {
   try {
-    // resolve inputs
+    // Lấy toạ độ từ input nếu chưa truyền vào
     let s = start,
       t = end;
     if (!s)
@@ -3234,6 +3175,7 @@ async function findSmartRoute(start, end) {
       return;
     }
 
+    // Nếu cả hai điểm đều trong campus thì vẽ đường campus, ngược lại vẽ kết hợp
     if (pointInCampus(s) && pointInCampus(t)) {
       drawCampusPath(s, t);
     } else {
@@ -3241,14 +3183,14 @@ async function findSmartRoute(start, end) {
     }
   } catch (e) {
     console.error("findSmartRoute", e);
-    // as final fallback, call plain computeAndRenderRoute if available
+    // Nếu lỗi thì fallback sang OSRM thường
     if (typeof computeAndRenderRoute === "function") {
       return computeAndRenderRoute(s.lat, s.lng, t.lat, t.lng);
     }
   }
 }
 
-// Override guardedFindRoute to use smart route
+// Ghi đè guardedFindRoute để dùng định tuyến thông minh
 const _orig_guarded = guardedFindRoute;
 guardedFindRoute = async function () {
   if (!hasBothInputs()) {
@@ -3271,17 +3213,17 @@ guardedFindRoute = async function () {
 };
 
 // xuli_internal_route_optimized.js
-// Optimized internal-only routing using CUSTOM_VISUAL_PATHS (<40 segments)
-// - Uses Dijkstra (optimized for small graphs)
-// - Smooths path via Chaikin subdivision (configurable iterations)
-// - Draws blue route (#2563eb) and updates #route-info with distance/time
-// - No external APIs used. Designed to integrate with existing xuli.js UI helpers.
+// Tối ưu hóa định tuyến nội bộ bằng CUSTOM_VISUAL_PATHS (<40 đoạn)
+// - Dùng Dijkstra (tối ưu cho đồ thị nhỏ)
+// - Làm mượt đường bằng Chaikin subdivision (có thể cấu hình số lần lặp)
+// - Vẽ tuyến đường màu xanh (#2563eb) và cập nhật #route-info với khoảng cách/thời gian
+// - Không dùng API ngoài. Thiết kế để tích hợp với UI helper của xuli.js.
 
 (function () {
   "use strict";
   if (typeof CUSTOM_VISUAL_PATHS === "undefined") CUSTOM_VISUAL_PATHS = [];
 
-  // --- utilities ---
+  // --- hàm tiện ích ---
   const toRad = (v) => (v * Math.PI) / 180;
   const hav = (a, b) => {
     const R = 6371000;
@@ -3295,11 +3237,11 @@ guardedFindRoute = async function () {
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
   };
 
-  // --- build compact graph ---
+  // --- xây đồ thị dạng gọn ---
   function buildGraph() {
     const nodes = []; // [ [lat,lng] ]
     const idMap = new Map(); // key -> id
-    const edges = []; // adjacency: array of arrays {to,w,pts}
+    const edges = []; // danh sách kề: mảng các mảng {to,w,pts}
 
     const key = (p) => p[0].toFixed(6) + "," + p[1].toFixed(6);
     const addNode = (p) => {
@@ -3341,7 +3283,7 @@ guardedFindRoute = async function () {
     return { nodes, edges };
   }
 
-  // nearest graph node by simple Euclidean approx (fast)
+  // tìm nút gần nhất bằng khoảng cách Euclid xấp xỉ (nhanh)
   function nearestNode(graph, latlng) {
     if (!graph || !graph.nodes || !graph.nodes.length) return -1;
     let best = -1,
@@ -3359,7 +3301,7 @@ guardedFindRoute = async function () {
     return best;
   }
 
-  // Dijkstra optimized for small graphs (<200 nodes)
+  // Thuật toán Dijkstra tối ưu cho đồ thị nhỏ (<200 nút)
   function dijkstra(graph, src, dst) {
     const N = graph.nodes.length;
     const dist = new Array(N).fill(Infinity);
@@ -3394,7 +3336,7 @@ guardedFindRoute = async function () {
     return path;
   }
 
-  // convert path indices -> latlngs using stored edge pts
+  // chuyển path dạng id -> latlng bằng pts lưu trong cạnh
   function pathToLatLngs(graph, path) {
     const out = [];
     for (let k = 0; k < path.length - 1; k++) {
@@ -3416,7 +3358,7 @@ guardedFindRoute = async function () {
           out.push([e.pts[0][0], e.pts[0][1]]);
         out.push([e.pts[1][0], e.pts[1][1]]);
       } else {
-        // fallback to nodes
+        // fallback: lấy từ nodes
         const na = graph.nodes[u],
           nb = graph.nodes[v];
         if (
@@ -3428,21 +3370,21 @@ guardedFindRoute = async function () {
         out.push([nb[0], nb[1]]);
       }
     }
-    // remove duplicates
+    // bỏ trùng lặp liên tiếp
     const clean = out.filter(
       (p, i) => i === 0 || !(p[0] === out[i - 1][0] && p[1] === out[i - 1][1])
     );
     return clean;
   }
 
-  // Chaikin subdivision for smoothing (2 iterations default -> gentle smoothing)
+  // Làm mượt bằng Chaikin subdivision (mặc định 2 lần lặp -> rất mượt)
   function smoothChaikin(points, iterations) {
     iterations = iterations == null ? 2 : iterations;
     if (!points || points.length < 3) return points;
     let pts = points.map((p) => [p[0], p[1]]);
     for (let it = 0; it < iterations; it++) {
       const next = [];
-      next.push(pts[0]); // keep endpoints
+      next.push(pts[0]); // giữ điểm đầu
       for (let i = 0; i < pts.length - 1; i++) {
         const p = pts[i],
           q = pts[i + 1];
@@ -3451,13 +3393,13 @@ guardedFindRoute = async function () {
         next.push(Q);
         next.push(R);
       }
-      next.push(pts[pts.length - 1]);
+      next.push(pts[pts.length - 1]); // giữ điểm cuối
       pts = next;
     }
     return pts;
   }
 
-  // compute total distance (meters) for latlng array
+  // Tính tổng khoảng cách (mét) từ danh sách latlng
   function totalDistance(latlngs) {
     let s = 0;
     for (let i = 0; i < latlngs.length - 1; i++)
@@ -3465,7 +3407,7 @@ guardedFindRoute = async function () {
     return s;
   }
 
-  // main: find and draw internal-only route
+  // Hàm chính: tìm và vẽ đường nội bộ
   function findAndDrawInternal(start, end) {
     try {
       if (!map) {
@@ -3486,17 +3428,17 @@ guardedFindRoute = async function () {
       const eIdx = nearestNode(graph, end);
       if (sIdx < 0 || eIdx < 0) {
         showCenterNotice &&
-          showCenterNotice("Không tìm được nút gần điểm", "error");
+          showCenterNotice("Không tìm được nút gần vị trí", "error");
         return;
       }
       const pidx = dijkstra(graph, sIdx, eIdx);
       if (!pidx) {
         showCenterNotice &&
-          showCenterNotice("Không tìm được tuyến nối 2 nút", "error");
+          showCenterNotice("Không tìm được tuyến nối hai điểm", "error");
         return;
       }
       let latlngs = pathToLatLngs(graph, pidx);
-      // connect actual endpoints if off-node (prepend/append)
+      // nối điểm thực tế nếu không trùng nút
       if (
         latlngs.length &&
         (latlngs[0][0] !== start.lat || latlngs[0][1] !== start.lng)
@@ -3508,16 +3450,19 @@ guardedFindRoute = async function () {
           latlngs[latlngs.length - 1][1] !== end.lng)
       )
         latlngs.push([end.lat, end.lng]);
-      // smooth
+
+      // làm mượt
       const smooth = smoothChaikin(latlngs, 2);
-      // remove near-duplicate points to keep polyline light
+
+      // lọc điểm trùng gần kề để nhẹ polyline
       const reduced = [smooth[0]];
       for (let i = 1; i < smooth.length; i++) {
         const a = reduced[reduced.length - 1],
           b = smooth[i];
         if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-6) reduced.push(b);
       }
-      // draw
+
+      // vẽ
       try {
         if (typeof routeLine !== "undefined" && routeLine)
           removeLayerIfExists(routeLine);
@@ -3527,7 +3472,8 @@ guardedFindRoute = async function () {
         { color: "#2563eb", weight: 6, opacity: 0.95, lineJoin: "round" }
       ).addTo(map);
       map.fitBounds(routeLine.getBounds(), { padding: [28, 28] });
-      // update info
+
+      // cập nhật thông tin tuyến
       const meters = totalDistance(reduced);
       renderRouteInfo &&
         renderRouteInfo({ distance: meters, duration: meters / 1.2 });
@@ -3538,7 +3484,7 @@ guardedFindRoute = async function () {
     }
   }
 
-  // Override guardedFindRoute to use internal-only routing
+  // Ghi đè guardedFindRoute để dùng định tuyến nội bộ
   const _orig =
     typeof guardedFindRoute === "function" ? guardedFindRoute : null;
   guardedFindRoute = async function () {
@@ -3591,7 +3537,7 @@ guardedFindRoute = async function () {
     }
   };
 
-  // expose for console/test
+  // expose cho console/test
   window.findAndDrawInternal = findAndDrawInternal;
   window.buildInternalGraph = buildGraph;
 })();

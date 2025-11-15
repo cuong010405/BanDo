@@ -10,7 +10,8 @@ SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret")
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
 # ALLOWED_HOSTS (tạm mở rộng hết, deploy thật thì chỉnh lại domain)
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["mappdthu.onrender.com", "127.0.0.1", "localhost"]
+
 
 # Email (nếu cần gửi mail thật)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -21,6 +22,9 @@ EMAIL_HOST_USER = 'cuonghiqpqp147@gmail.com'
 EMAIL_HOST_PASSWORD = 'bzgqgeqpcoaitgre'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 CONTACT_TO_EMAIL = 'cuonghiqpqp147@gmail.com'
+CSRF_TRUSTED_ORIGINS = [
+    "https://mappdthu.onrender.com"
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',

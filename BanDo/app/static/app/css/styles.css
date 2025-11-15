@@ -432,7 +432,14 @@ body { background: var(--bg); color: #e5e7eb; font-family: sans-serif; }
 
 .leaflet-control-custom:hover {
   background: #f0f0f0 !important;
+  
 }
+
+
+
+
+
+
 
 
 

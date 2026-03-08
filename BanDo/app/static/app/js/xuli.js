@@ -139,7 +139,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const bounds = [
       [10.424125, 105.638641], // Góc dưới trái (rộng hơn)
       [10.417701, 105.647316], // Góc trên phải (rộng hơn)
-      
     ];
     map.setMaxBounds(bounds);
 
@@ -921,8 +920,12 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener("keydown", (ev) => {
       if (ev.key === "Escape") closeOverlay();
     });
+
+    // Lấy phần tử nút vị trí chỉ 1 lần, dùng cho toggle nháy
     const locBtnElem = document.getElementById("loc-btn");
-    let _trackingBlink = false; // trạng thái nháy
+    let _trackingBlink = false; // Trạng thái nháy hiện tại
+    let _geoActive = false; // Đang bật định vị
+    // Hàm bật nháy cho icon vị trí
     function startTrackingBlink() {
       if (!locBtnElem || _trackingBlink) return;
       const iconEl =
@@ -933,6 +936,7 @@ document.addEventListener("DOMContentLoaded", function () {
       _trackingBlink = true;
     }
 
+    // Hàm tắt nháy cho icon vị trí
     function stopTrackingBlink() {
       if (!locBtnElem || !_trackingBlink) return;
       const iconEl =
@@ -943,9 +947,28 @@ document.addEventListener("DOMContentLoaded", function () {
       _trackingBlink = false;
     }
 
+    // Toggle nháy khi bấm nút vị trí
+    if (locBtnElem) {
+      locBtnElem.addEventListener("click", function (ev) {
+        // Nếu đang bật định vị, bấm lần nữa sẽ tắt nháy và hủy định vị
+        if (_geoActive) {
+          stopTrackingBlink();
+          _geoActive = false;
+        } else {
+          startTrackingBlink();
+          _geoActive = true;
+          // Gọi định vị và cập nhật marker vị trí
+          if (typeof window.getCurrentLocation === "function") {
+            window.getCurrentLocation();
+          }
+        }
+      });
+    }
+
     // Expose để gọi từ logic theo dõi (ví dụ khi stopWatchPosition)
     window.startTrackingBlink = startTrackingBlink;
     window.stopTrackingBlink = stopTrackingBlink;
+    window._geoActive = () => _geoActive;
   }
 
   // ====== Utils ======
@@ -1478,6 +1501,40 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     if (typeof window.startTrackingBlink === "function")
       window.startTrackingBlink();
+    if (typeof window._geoActive === "function") window._geoActive(true);
+    // Biến lưu heading hiện tại (nếu có)
+    let heading = 0;
+    // Lắng nghe sự kiện orientation từ thiết bị (nếu có)
+    function handleOrientation(event) {
+      if (typeof event.alpha === "number") {
+        heading = 360 - event.alpha; // alpha: 0 là bắc, đảo chiều cho đúng hướng
+        lastHeadingDeg = heading;
+        if (userLocationMarker) {
+          userLocationMarker.setIcon(buildUserHeadingIcon(heading));
+        }
+      }
+    }
+    // Đăng ký lắng nghe orientation nếu có hỗ trợ
+    if (
+      window.DeviceOrientationEvent &&
+      typeof window.DeviceOrientationEvent.requestPermission === "function"
+    ) {
+      // iOS 13+ cần xin quyền
+      window.DeviceOrientationEvent.requestPermission()
+        .then((response) => {
+          if (response === "granted") {
+            window.addEventListener(
+              "deviceorientation",
+              handleOrientation,
+              true
+            );
+          }
+        })
+        .catch(() => {});
+    } else if (window.DeviceOrientationEvent) {
+      window.addEventListener("deviceorientation", handleOrientation, true);
+    }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const lat = pos.coords.latitude;
@@ -1491,14 +1548,26 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!isNearCampus(lat, lng, 1500)) {
           showCenterNotice("Bạn đang ở ngoài khu vực bản đồ!", "warn");
         }
-        // Hiển thị marker vị trí hiện tại
+        // Nếu có heading từ orientation thì dùng, nếu không thì tính hướng di chuyển
+        let markerHeading = null;
+        if (orientationActive && typeof heading === "number") {
+          markerHeading = heading;
+        } else if (prevUserLatLng) {
+          markerHeading = computeBearing(prevUserLatLng, { lat, lng });
+        } else {
+          markerHeading = 0;
+        }
+        lastHeadingDeg = markerHeading;
+        // Hiển thị marker vị trí hiện tại với mũi tên hướng
         if (!userLocationMarker) {
           userLocationMarker = L.marker(ll, {
-            icon: buildUserHeadingIcon(0),
+            icon: buildUserHeadingIcon(markerHeading),
           }).addTo(map);
         } else {
           userLocationMarker.setLatLng(ll);
+          userLocationMarker.setIcon(buildUserHeadingIcon(markerHeading));
         }
+        prevUserLatLng = { lat, lng };
         if (!userAccuracyCircle) {
           userAccuracyCircle = L.circle(ll, {
             radius: acc,
@@ -1527,6 +1596,7 @@ document.addEventListener("DOMContentLoaded", function () {
           geoBtn.innerHTML = geoBtn.dataset.originalText;
         if (typeof window.stopTrackingBlink === "function")
           window.stopTrackingBlink();
+        if (typeof window._geoActive === "function") window._geoActive(false);
       },
       (err) => {
         console.warn(err);
@@ -1539,6 +1609,7 @@ document.addEventListener("DOMContentLoaded", function () {
           geoBtn.innerHTML = geoBtn.dataset.originalText;
         if (typeof window.stopTrackingBlink === "function")
           window.stopTrackingBlink();
+        if (typeof window._geoActive === "function") window._geoActive(false);
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
     );

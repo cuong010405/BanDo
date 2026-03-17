@@ -780,13 +780,34 @@ document.addEventListener("DOMContentLoaded", function () {
       _trackingBlink = false;
     }
 
+    // Hàm xử lý orientation dùng chung cho cả toggle và getCurrentLocation
+    function _handleOrientation(event) {
+      let compassHeading = null;
+      // iOS: dùng webkitCompassHeading (đã là clockwise từ bắc)
+      if (typeof event.webkitCompassHeading === "number") {
+        compassHeading = event.webkitCompassHeading;
+      } else if (typeof event.alpha === "number") {
+        // Android: alpha là góc quay ngược chiều kim đồng hồ từ bắc
+        compassHeading = (360 - event.alpha) % 360;
+      }
+      if (compassHeading !== null) {
+        lastHeadingDeg = compassHeading;
+        orientationActive = true;
+        if (userLocationMarker) {
+          userLocationMarker.setIcon(buildUserHeadingIcon(compassHeading));
+        }
+      }
+    }
+
     // Toggle nháy và theo dõi vị trí liên tục khi bấm nút vị trí
+    let _firstPositionReceived = false; // Đã nhận vị trí đầu tiên chưa (để pan map)
     if (locBtnElem) {
       locBtnElem.addEventListener("click", function (ev) {
         if (_geoActive) {
           // Đang theo dõi, bấm lần nữa sẽ tắt
           stopTrackingBlink();
           _geoActive = false;
+          _firstPositionReceived = false;
           // Hủy theo dõi vị trí liên tục
           if (userWatchId !== null) {
             navigator.geolocation.clearWatch(userWatchId);
@@ -801,71 +822,100 @@ document.addEventListener("DOMContentLoaded", function () {
             map.removeLayer(userAccuracyCircle);
             userAccuracyCircle = null;
           }
+          // Tắt lắng nghe orientation
+          try {
+            window.removeEventListener("deviceorientation", _handleOrientation, true);
+          } catch (e) {}
+          orientationActive = false;
         } else {
+          if (!navigator.geolocation) {
+            showCenterNotice("Trình duyệt không hỗ trợ định vị vị trí!", "error");
+            return;
+          }
           startTrackingBlink();
           _geoActive = true;
-          // Theo dõi vị trí liên tục
-          if (navigator.geolocation) {
-            userWatchId = navigator.geolocation.watchPosition(
-              (pos) => {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                const acc =
-                  typeof pos.coords.accuracy === "number"
-                    ? pos.coords.accuracy
-                    : Infinity;
-                const ll = L.latLng(lat, lng);
-                // Hướng xử lý như getCurrentLocation
-                let markerHeading = 0;
-                if (orientationActive && typeof lastHeadingDeg === "number") {
-                  markerHeading = lastHeadingDeg;
-                } else if (prevUserLatLng) {
-                  markerHeading = computeBearing(prevUserLatLng, { lat, lng });
+          _firstPositionReceived = false;
+          // Đăng ký lắng nghe orientation (la bàn)
+          if (
+            window.DeviceOrientationEvent &&
+            typeof window.DeviceOrientationEvent.requestPermission === "function"
+          ) {
+            window.DeviceOrientationEvent.requestPermission()
+              .then((response) => {
+                if (response === "granted") {
+                  window.addEventListener("deviceorientation", _handleOrientation, true);
                 }
-                lastHeadingDeg = markerHeading;
-                if (!userLocationMarker) {
-                  userLocationMarker = L.marker(ll, {
-                    icon: buildUserHeadingIcon(markerHeading),
-                  }).addTo(map);
-                } else {
-                  userLocationMarker.setLatLng(ll);
-                  userLocationMarker.setIcon(
-                    buildUserHeadingIcon(markerHeading),
-                  );
-                }
-                prevUserLatLng = { lat, lng };
-                if (!userAccuracyCircle) {
-                  userAccuracyCircle = L.circle(ll, {
-                    radius: acc,
-                    color: "#60a5fa",
-                    weight: 1,
-                    fillColor: "#3b82f6",
-                    fillOpacity: 0.1,
-                  }).addTo(map);
-                } else {
-                  userAccuracyCircle.setLatLng(ll);
-                  userAccuracyCircle.setRadius(acc);
-                }
-              },
-              (err) => {
-                stopTrackingBlink();
-                _geoActive = false;
-                if (typeof showCenterNotice === "function") {
-                  showCenterNotice(
-                    "Không thể lấy vị trí liên tục: " +
-                      (err.message || "Lỗi không xác định"),
-                    "error",
-                  );
-                } else {
-                  alert(
-                    "Không thể lấy vị trí liên tục: " +
-                      (err.message || "Lỗi không xác định"),
-                  );
-                }
-              },
-              { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
-            );
+              })
+              .catch(() => {});
+          } else if (window.DeviceOrientationEvent) {
+            window.addEventListener("deviceorientation", _handleOrientation, true);
           }
+          // Theo dõi vị trí liên tục
+          userWatchId = navigator.geolocation.watchPosition(
+            (pos) => {
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              const acc =
+                typeof pos.coords.accuracy === "number"
+                  ? pos.coords.accuracy
+                  : Infinity;
+              const ll = L.latLng(lat, lng);
+              // Hướng: ưu tiên orientation (la bàn), sau đó tính từ di chuyển
+              let markerHeading = 0;
+              if (orientationActive && typeof lastHeadingDeg === "number") {
+                markerHeading = lastHeadingDeg;
+              } else if (prevUserLatLng) {
+                markerHeading = computeBearing(prevUserLatLng, { lat, lng });
+              }
+              lastHeadingDeg = markerHeading;
+              if (!userLocationMarker) {
+                userLocationMarker = L.marker(ll, {
+                  icon: buildUserHeadingIcon(markerHeading),
+                }).addTo(map);
+              } else {
+                userLocationMarker.setLatLng(ll);
+                userLocationMarker.setIcon(
+                  buildUserHeadingIcon(markerHeading),
+                );
+              }
+              prevUserLatLng = { lat, lng };
+              if (!userAccuracyCircle) {
+                userAccuracyCircle = L.circle(ll, {
+                  radius: acc,
+                  color: "#60a5fa",
+                  weight: 1,
+                  fillColor: "#3b82f6",
+                  fillOpacity: 0.1,
+                }).addTo(map);
+              } else {
+                userAccuracyCircle.setLatLng(ll);
+                userAccuracyCircle.setRadius(acc);
+              }
+              // Pan map về vị trí khi nhận vị trí đầu tiên
+              if (!_firstPositionReceived) {
+                _firstPositionReceived = true;
+                map.setView(ll, Math.max(map.getZoom(), 17));
+              }
+            },
+            (err) => {
+              stopTrackingBlink();
+              _geoActive = false;
+              _firstPositionReceived = false;
+              if (typeof showCenterNotice === "function") {
+                showCenterNotice(
+                  "Không thể lấy vị trí liên tục: " +
+                    (err.message || "Lỗi không xác định"),
+                  "error",
+                );
+              } else {
+                alert(
+                  "Không thể lấy vị trí liên tục: " +
+                    (err.message || "Lỗi không xác định"),
+                );
+              }
+            },
+            { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+          );
         }
       });
     }
@@ -1422,8 +1472,16 @@ document.addEventListener("DOMContentLoaded", function () {
     let heading = 0;
     // Lắng nghe sự kiện orientation từ thiết bị (nếu có)
     function handleOrientation(event) {
-      if (typeof event.alpha === "number") {
-        heading = 360 - event.alpha; // alpha: 0 là bắc, đảo chiều cho đúng hướng
+      let compassHeading = null;
+      // iOS: dùng webkitCompassHeading (đã là clockwise từ bắc)
+      if (typeof event.webkitCompassHeading === "number") {
+        compassHeading = event.webkitCompassHeading;
+      } else if (typeof event.alpha === "number") {
+        // Android: alpha ngược chiều kim đồng hồ, cần đảo
+        compassHeading = (360 - event.alpha) % 360;
+      }
+      if (compassHeading !== null) {
+        heading = compassHeading;
         lastHeadingDeg = heading;
         orientationActive = true;
         if (userLocationMarker) {

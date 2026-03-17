@@ -891,6 +891,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 userAccuracyCircle.setLatLng(ll);
                 userAccuracyCircle.setRadius(acc);
               }
+              // Đặt vị trí hiện tại làm điểm xuất phát
+              programmaticUpdate = true;
+              setAsStart({ lat, lng }, `${lat.toFixed(6)},${lng.toFixed(6)}`);
+              programmaticUpdate = false;
+
               // Pan map về vị trí khi nhận vị trí đầu tiên
               if (!_firstPositionReceived) {
                 _firstPositionReceived = true;

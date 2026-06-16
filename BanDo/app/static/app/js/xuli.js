@@ -77,6 +77,48 @@ document.addEventListener("DOMContentLoaded", function () {
   window.findRoute = guardedFindRoute;
   window.getCurrentLocation = getCurrentLocation;
   window.resetMap = resetMap;
+
+  // ====== Xoay bản đồ 360° (leaflet-rotate) ======
+  // Hàm reset bản đồ về hướng Bắc (bearing = 0)
+  window.resetMapBearing = function () {
+    if (!map) return;
+    try {
+      if (typeof map.setBearing === "function") {
+        map.setBearing(0);
+      }
+    } catch (e) {}
+    // Cập nhật icon la bàn về trạng thái gốc
+    const compassIcon = document.getElementById("compass-icon");
+    if (compassIcon) {
+      compassIcon.style.transform = "rotate(0deg)";
+      compassIcon.style.color = "";
+    }
+    // Xóa class active khi về Bắc
+    const compassBtn = document.getElementById("compass-btn");
+    if (compassBtn) compassBtn.classList.remove("is-rotated");
+  };
+
+  // Cập nhật icon la bàn khi bản đồ bị xoay
+  if (map) {
+    map.on("rotate", function () {
+      try {
+        const bearing = typeof map.getBearing === "function" ? map.getBearing() : 0;
+        const compassIcon = document.getElementById("compass-icon");
+        const compassBtn  = document.getElementById("compass-btn");
+        const rotated = Math.abs(bearing) > 2;
+        if (compassIcon) {
+          // Xoay icon ngược lại để kim la bàn luôn chỉ Bắc thực
+          compassIcon.style.transform = `rotate(${-bearing}deg)`;
+          compassIcon.style.color = rotated ? "#f97316" : "";
+        }
+        // Toggle class is-rotated để bật/tắt hiệu ứng pulse trên nút
+        if (compassBtn) {
+          if (rotated) compassBtn.classList.add("is-rotated");
+          else compassBtn.classList.remove("is-rotated");
+        }
+      } catch (e) {}
+    });
+  }
   // Hidden walkway network (NOT rendered). Used by routing only.
   // Initialize from existing global or localStorage and expose runtime APIs.
   if (!Array.isArray(window.WALKWAY_NETWORK)) window.WALKWAY_NETWORK = [];
@@ -879,22 +921,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
               }
               prevUserLatLng = { lat, lng };
-              if (!userAccuracyCircle) {
-                userAccuracyCircle = L.circle(ll, {
-                  radius: acc,
-                  color: "#60a5fa",
-                  weight: 1,
-                  fillColor: "#3b82f6",
-                  fillOpacity: 0.1,
-                }).addTo(map);
-              } else {
-                userAccuracyCircle.setLatLng(ll);
-                userAccuracyCircle.setRadius(acc);
-              }
+
               // Đặt vị trí hiện tại làm điểm xuất phát
               programmaticUpdate = true;
               setAsStart({ lat, lng }, `${lat.toFixed(6)},${lng.toFixed(6)}`);
               programmaticUpdate = false;
+
+              // Cập nhật giọng nói dẫn đường theo GPS
+              if (window.VoiceNav && typeof window.VoiceNav.updateVoiceNav === "function") {
+                window.VoiceNav.updateVoiceNav(lat, lng);
+              }
 
               // Pan map về vị trí khi nhận vị trí đầu tiên
               if (!_firstPositionReceived) {
@@ -1351,6 +1387,12 @@ document.addEventListener("DOMContentLoaded", function () {
     removeLayerIfExists(routeLine);
     removeLayerIfExists(highlightMarker);
     startMarker = endMarker = routeLine = highlightMarker = null;
+
+    // Dừng giọng nói dẫn đường khi reset
+    if (window.VoiceNav && typeof window.VoiceNav.stopVoiceNav === "function") {
+      window.VoiceNav.stopVoiceNav();
+    }
+
     if (startEl) {
       startEl.value = "";
       clearInputDatasets(startEl);
@@ -1559,22 +1601,17 @@ document.addEventListener("DOMContentLoaded", function () {
           console.log("[Geolocation] Updated userLocationMarker");
         }
         prevUserLatLng = { lat, lng };
-        if (!userAccuracyCircle) {
-          userAccuracyCircle = L.circle(ll, {
-            radius: acc,
-            color: "#60a5fa",
-            weight: 1,
-            fillColor: "#3b82f6",
-            fillOpacity: 0.1,
-          }).addTo(map);
-        } else {
-          userAccuracyCircle.setLatLng(ll);
-          userAccuracyCircle.setRadius(acc);
-        }
+
         // Đặt làm điểm xuất phát
         programmaticUpdate = true;
         setAsStart({ lat, lng }, `${lat.toFixed(6)},${lng.toFixed(6)}`);
         programmaticUpdate = false;
+
+        // Cập nhật giọng nói dẫn đường theo GPS
+        if (window.VoiceNav && typeof window.VoiceNav.updateVoiceNav === "function") {
+          window.VoiceNav.updateVoiceNav(lat, lng);
+        }
+
         map.setView(ll, Math.max(map.getZoom(), 15));
         initializedStartFromWatch = true;
         if (hasBothInputs()) {
@@ -2797,6 +2834,11 @@ document.addEventListener("DOMContentLoaded", function () {
     const speedMps = 1.2; // ~4.3 km/h
     const dur = dist / speedMps;
     renderRouteInfo({ distance: dist, duration: dur });
+
+    // Bắt đầu giọng nói dẫn đường
+    if (window.VoiceNav && typeof window.VoiceNav.startVoiceNav === "function") {
+      window.VoiceNav.startVoiceNav(coords);
+    }
     if (startMarker) {
       removeLayerIfExists(startMarker);
       startMarker = null;
@@ -3527,6 +3569,11 @@ guardedFindRoute = async function () {
       const meters = totalDistance(reduced);
       renderRouteInfo &&
         renderRouteInfo({ distance: meters, duration: meters / 1.2 });
+
+      // Bắt đầu giọng nói dẫn đường
+      if (window.VoiceNav && typeof window.VoiceNav.startVoiceNav === "function") {
+        window.VoiceNav.startVoiceNav(reduced.map((p) => [p[0], p[1]]));
+      }
     } catch (err) {
       console.error("findAndDrawInternal error", err);
       showCenterNotice &&
@@ -3590,4 +3637,285 @@ guardedFindRoute = async function () {
   // expose cho console/test
   window.findAndDrawInternal = findAndDrawInternal;
   window.buildInternalGraph = buildGraph;
+})();
+
+// ======= MODULE GIỌNG NÓI DẪN ĐƯỜNG (VoiceNav) =======
+(function () {
+  "use strict";
+
+  // --- Trạng thái ---
+  let voiceNavActive = false; // Đang dẫn đường bằng giọng nói
+  let currentRouteCoords = []; // Tọa độ tuyến đường hiện tại
+  let turnInstructions = []; // Danh sách hướng dẫn rẽ
+  let spokenInstructions = new Set(); // Đánh dấu hướng dẫn đã phát
+  let lastSpokenTime = 0; // Thời gian phát câu cuối cùng
+  const MIN_SPEAK_INTERVAL_MS = 3000; // Khoảng cách tối thiểu giữa hai câu nói (3s)
+  const TURN_TRIGGER_DIST_M = 20; // Khoảng cách kích hoạt hướng dẫn rẽ (mét)
+  const ARRIVAL_DIST_M = 20; // Khoảng cách báo đã đến nơi (mét)
+  let arrivedAnnounced = false; // Đã thông báo đến nơi chưa
+
+  // --- Chọn giọng tiếng Việt ---
+  let cachedViVoice = null;
+  function getVietnameseVoice() {
+    if (cachedViVoice) return cachedViVoice;
+    if (!window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    // Ưu tiên giọng có lang bắt đầu bằng "vi"
+    cachedViVoice =
+      voices.find((v) => v.lang.startsWith("vi")) ||
+      voices.find((v) => v.lang.includes("vi")) ||
+      null;
+    return cachedViVoice;
+  }
+  // Preload voices
+  if (window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = () => {
+      cachedViVoice = null;
+      getVietnameseVoice();
+    };
+  }
+
+  // --- Phát giọng nói ---
+  function speak(text) {
+    if (!text) return;
+    if (!window.speechSynthesis) {
+      console.warn("[VoiceNav] SpeechSynthesis không được hỗ trợ");
+      return;
+    }
+    // Tránh phát quá nhanh
+    const now = Date.now();
+    if (now - lastSpokenTime < MIN_SPEAK_INTERVAL_MS) return;
+    lastSpokenTime = now;
+
+    // Hủy câu cũ nếu đang nói
+    window.speechSynthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "vi-VN";
+    utterance.rate = 1.05; // Hơi nhanh hơn bình thường
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    const voice = getVietnameseVoice();
+    if (voice) utterance.voice = voice;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  // --- Tính khoảng cách 2 điểm (mét) ---
+  function _havDist(lat1, lng1, lat2, lng2) {
+    const R = 6371000;
+    const toRad = (x) => (x * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1),
+      dLng = toRad(lng2 - lng1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  // --- Tính góc giữa 2 vector (bearing) ---
+  function _bearing(lat1, lng1, lat2, lng2) {
+    const toRad = (x) => (x * Math.PI) / 180;
+    const toDeg = (x) => (x * 180) / Math.PI;
+    const dLng = toRad(lng2 - lng1);
+    const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+    const x =
+      Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+      Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+    return ((toDeg(Math.atan2(y, x)) % 360) + 360) % 360;
+  }
+
+  // --- Tính góc quay giữa 3 điểm liên tiếp (A→B→C) ---
+  // Trả về giá trị [-180, 180], dương = rẽ phải, âm = rẽ trái
+  function _turnAngle(A, B, C) {
+    const b1 = _bearing(A[0], A[1], B[0], B[1]);
+    const b2 = _bearing(B[0], B[1], C[0], C[1]);
+    let diff = b2 - b1;
+    if (diff > 180) diff -= 360;
+    if (diff < -180) diff += 360;
+    return diff;
+  }
+
+  // --- Tạo danh sách hướng dẫn từ tọa độ tuyến đường ---
+  function generateTurnInstructions(coords) {
+    if (!coords || coords.length < 2) return [];
+    const instructions = [];
+
+    // Lọc bớt các điểm quá gần nhau (< 3m) để tránh tạo quá nhiều hướng dẫn
+    const filtered = [coords[0]];
+    for (let i = 1; i < coords.length; i++) {
+      const prev = filtered[filtered.length - 1];
+      const d = _havDist(prev[0], prev[1], coords[i][0], coords[i][1]);
+      if (d >= 3 || i === coords.length - 1) {
+        filtered.push(coords[i]);
+      }
+    }
+
+    // Phân tích mỗi bộ 3 điểm liên tiếp
+    for (let i = 1; i < filtered.length - 1; i++) {
+      const A = filtered[i - 1];
+      const B = filtered[i];
+      const C = filtered[i + 1];
+      const angle = _turnAngle(A, B, C);
+      const absAngle = Math.abs(angle);
+
+      // Chỉ tạo hướng dẫn khi góc rẽ đáng kể (> 25°)
+      if (absAngle < 25) continue;
+
+      // Tính khoảng cách từ đầu tuyến đến điểm rẽ
+      let distFromStart = 0;
+      for (let j = 1; j <= i; j++) {
+        distFromStart += _havDist(
+          filtered[j - 1][0],
+          filtered[j - 1][1],
+          filtered[j][0],
+          filtered[j][1],
+        );
+      }
+
+      let direction, text;
+      if (absAngle >= 130) {
+        direction = angle > 0 ? "quay đầu bên phải" : "quay đầu bên trái";
+      } else if (absAngle >= 60) {
+        direction = angle > 0 ? "rẽ phải" : "rẽ trái";
+      } else {
+        direction = angle > 0 ? "chếch phải" : "chếch trái";
+      }
+
+      const distRound = Math.round(distFromStart);
+      text = `Sau ${distRound} mét, ${direction}`;
+
+      instructions.push({
+        index: i,
+        lat: B[0],
+        lng: B[1],
+        angle: angle,
+        direction: direction,
+        text: text,
+        distFromStart: distFromStart,
+      });
+    }
+
+    return instructions;
+  }
+
+  // --- Bắt đầu dẫn đường ---
+  function startVoiceNav(coords) {
+    if (!coords || coords.length < 2) return;
+
+    currentRouteCoords = coords;
+    turnInstructions = generateTurnInstructions(coords);
+    spokenInstructions = new Set();
+    arrivedAnnounced = false;
+    voiceNavActive = true;
+
+    // Tính tổng quãng đường
+    let totalDist = 0;
+    for (let i = 1; i < coords.length; i++) {
+      totalDist += _havDist(
+        coords[i - 1][0],
+        coords[i - 1][1],
+        coords[i][0],
+        coords[i][1],
+      );
+    }
+    const distText =
+      totalDist >= 1000
+        ? `${(totalDist / 1000).toFixed(1)} ki-lô-mét`
+        : `${Math.round(totalDist)} mét`;
+
+    // Phát câu mở đầu
+    const turnCount = turnInstructions.length;
+    let openingText = `Bắt đầu dẫn đường. Tổng quãng đường ${distText}.`;
+    if (turnCount > 0) {
+      openingText += ` Có ${turnCount} điểm rẽ.`;
+    }
+    speak(openingText);
+
+    // Phát hướng dẫn đầu tiên sau 4 giây
+    if (turnInstructions.length > 0) {
+      setTimeout(() => {
+        if (voiceNavActive && !spokenInstructions.has(0)) {
+          spokenInstructions.add(0);
+          speak(turnInstructions[0].text);
+        }
+      }, 4500);
+    }
+
+    console.log(
+      "[VoiceNav] Bắt đầu dẫn đường, tổng:",
+      Math.round(totalDist),
+      "m,",
+      turnCount,
+      "điểm rẽ",
+    );
+  }
+
+  // --- Cập nhật dẫn đường theo GPS ---
+  function updateVoiceNav(userLat, userLng) {
+    if (!voiceNavActive) return;
+    if (!currentRouteCoords || currentRouteCoords.length < 2) return;
+
+    // Kiểm tra đã đến nơi chưa
+    const lastPt = currentRouteCoords[currentRouteCoords.length - 1];
+    const distToEnd = _havDist(userLat, userLng, lastPt[0], lastPt[1]);
+    if (distToEnd <= ARRIVAL_DIST_M && !arrivedAnnounced) {
+      arrivedAnnounced = true;
+      speak("Bạn đã đến nơi. Kết thúc dẫn đường.");
+      voiceNavActive = false;
+      return;
+    }
+
+    // Kiểm tra từng hướng dẫn rẽ
+    for (let i = 0; i < turnInstructions.length; i++) {
+      if (spokenInstructions.has(i)) continue;
+      const inst = turnInstructions[i];
+      const dist = _havDist(userLat, userLng, inst.lat, inst.lng);
+      if (dist <= TURN_TRIGGER_DIST_M) {
+        spokenInstructions.add(i);
+        // Phát hướng dẫn hiện tại
+        speak(inst.direction);
+
+        // Xem trước hướng dẫn tiếp theo
+        const nextIdx = i + 1;
+        if (nextIdx < turnInstructions.length) {
+          const nextInst = turnInstructions[nextIdx];
+          const distToNext = _havDist(
+            inst.lat,
+            inst.lng,
+            nextInst.lat,
+            nextInst.lng,
+          );
+          setTimeout(() => {
+            if (voiceNavActive && !spokenInstructions.has(nextIdx)) {
+              speak(
+                `Tiếp theo, sau ${Math.round(distToNext)} mét, ${nextInst.direction}`,
+              );
+            }
+          }, 3500);
+        }
+        break; // Chỉ phát 1 hướng dẫn mỗi lần
+      }
+    }
+  }
+
+  // --- Dừng dẫn đường ---
+  function stopVoiceNav() {
+    voiceNavActive = false;
+    currentRouteCoords = [];
+    turnInstructions = [];
+    spokenInstructions = new Set();
+    arrivedAnnounced = false;
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
+  // --- Expose API ra global ---
+  window.VoiceNav = {
+    speak,
+    startVoiceNav,
+    updateVoiceNav,
+    stopVoiceNav,
+    isActive: () => voiceNavActive,
+  };
 })();

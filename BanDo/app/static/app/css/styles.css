@@ -516,3 +516,33 @@ body {
 .leaflet-control-custom:hover {
   background: #f0f0f0 !important;
 }
+
+/* ====== La bàn / Compass button ====== */
+#compass-btn {
+  cursor: pointer;
+}
+#compass-icon {
+  /* Transition mượt khi icon xoay theo góc bản đồ */
+  transition: transform 0.2s ease-out, color 0.2s ease;
+  display: inline-block;
+}
+/* La bàn: transform được phép thay đổi (không bị override như #loc-btn) */
+
+/* ====== Trạng thái đang xoay bản đồ ====== */
+/* Icon la bàn nhấp nháy giống nút vị trí khi bản đồ đang xoay */
+#compass-btn.is-rotated .sidebar-icon,
+#compass-btn.is-rotated i {
+  animation: icon-blink 0.7s linear infinite;
+  /* Override màu drop-shadow sang cam thay vì xanh */
+  filter: brightness(1.3) drop-shadow(0 0 6px #f97316);
+}
+/* Nền nhạt + chữ cam để nổi bật thêm */
+#compass-btn.is-rotated {
+  background: rgba(249, 115, 22, 0.10) !important;
+  border-radius: 10px;
+}
+#compass-btn.is-rotated .sidebar-label {
+  color: #f97316;
+  font-weight: 700;
+}
+

@@ -102,9 +102,10 @@ document.addEventListener("DOMContentLoaded", function () {
   if (map) {
     map.on("rotate", function () {
       try {
-        const bearing = typeof map.getBearing === "function" ? map.getBearing() : 0;
+        const bearing =
+          typeof map.getBearing === "function" ? map.getBearing() : 0;
         const compassIcon = document.getElementById("compass-icon");
-        const compassBtn  = document.getElementById("compass-btn");
+        const compassBtn = document.getElementById("compass-btn");
         const rotated = Math.abs(bearing) > 2;
         if (compassIcon) {
           // Xoay icon ngược lại để kim la bàn luôn chỉ Bắc thực
@@ -866,12 +867,19 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           // Tắt lắng nghe orientation
           try {
-            window.removeEventListener("deviceorientation", _handleOrientation, true);
+            window.removeEventListener(
+              "deviceorientation",
+              _handleOrientation,
+              true,
+            );
           } catch (e) {}
           orientationActive = false;
         } else {
           if (!navigator.geolocation) {
-            showCenterNotice("Trình duyệt không hỗ trợ định vị vị trí!", "error");
+            showCenterNotice(
+              "Trình duyệt không hỗ trợ định vị vị trí!",
+              "error",
+            );
             return;
           }
           startTrackingBlink();
@@ -880,59 +888,115 @@ document.addEventListener("DOMContentLoaded", function () {
           // Đăng ký lắng nghe orientation (la bàn)
           if (
             window.DeviceOrientationEvent &&
-            typeof window.DeviceOrientationEvent.requestPermission === "function"
+            typeof window.DeviceOrientationEvent.requestPermission ===
+              "function"
           ) {
             window.DeviceOrientationEvent.requestPermission()
               .then((response) => {
                 if (response === "granted") {
-                  window.addEventListener("deviceorientation", _handleOrientation, true);
+                  window.addEventListener(
+                    "deviceorientation",
+                    _handleOrientation,
+                    true,
+                  );
                 }
               })
               .catch(() => {});
           } else if (window.DeviceOrientationEvent) {
-            window.addEventListener("deviceorientation", _handleOrientation, true);
+            window.addEventListener(
+              "deviceorientation",
+              _handleOrientation,
+              true,
+            );
           }
           // Theo dõi vị trí liên tục
           userWatchId = navigator.geolocation.watchPosition(
             (pos) => {
               const lat = pos.coords.latitude;
               const lng = pos.coords.longitude;
-              const acc =
-                typeof pos.coords.accuracy === "number"
-                  ? pos.coords.accuracy
-                  : Infinity;
               const ll = L.latLng(lat, lng);
-              // Hướng: ưu tiên orientation (la bàn), sau đó tính từ di chuyển
-              let markerHeading = 0;
+
+              // ---- Heading: ưu tiên la bàn (orientation), fallback tính từ di chuyển ----
+              // Không ghi đè lastHeadingDeg từ la bàn bằng heading di chuyển
+              let markerHeading;
               if (orientationActive && typeof lastHeadingDeg === "number") {
+                // La bàn đang hoạt động: dùng heading từ la bàn, không thay đổi
                 markerHeading = lastHeadingDeg;
               } else if (prevUserLatLng) {
-                markerHeading = computeBearing(prevUserLatLng, { lat, lng });
+                // Không có la bàn: tính từ vector di chuyển
+                const movBearing = computeBearing(prevUserLatLng, { lat, lng });
+                if (movBearing !== null) {
+                  lastHeadingDeg = movBearing;
+                }
+                markerHeading = lastHeadingDeg;
+              } else {
+                markerHeading = lastHeadingDeg || 0;
               }
-              lastHeadingDeg = markerHeading;
+
+              // ---- Cập nhật marker: chỉ rebuild icon khi heading thay đổi đáng kể (>5°) ----
+              const prevHdg = userLocationMarker ? userLocationMarker._lastHeadingDeg : null;
+              const headingChanged = prevHdg === null || Math.abs(normalizeHeading(markerHeading) - normalizeHeading(prevHdg)) > 5;
               if (!userLocationMarker) {
                 userLocationMarker = L.marker(ll, {
                   icon: buildUserHeadingIcon(markerHeading),
                 }).addTo(map);
+                userLocationMarker._lastHeadingDeg = markerHeading;
               } else {
                 userLocationMarker.setLatLng(ll);
-                userLocationMarker.setIcon(
-                  buildUserHeadingIcon(markerHeading),
-                );
+                if (headingChanged) {
+                  userLocationMarker.setIcon(buildUserHeadingIcon(markerHeading));
+                  userLocationMarker._lastHeadingDeg = markerHeading;
+                }
               }
               prevUserLatLng = { lat, lng };
 
-              // Đặt vị trí hiện tại làm điểm xuất phát
+              // ---- Đặt vị trí hiện tại làm điểm xuất phát ----
               programmaticUpdate = true;
               setAsStart({ lat, lng }, `${lat.toFixed(6)},${lng.toFixed(6)}`);
               programmaticUpdate = false;
 
-              // Cập nhật giọng nói dẫn đường theo GPS
-              if (window.VoiceNav && typeof window.VoiceNav.updateVoiceNav === "function") {
+              // ---- Kiểm tra đã đến điểm đến chưa ----
+              if (
+                !reachedDestination &&
+                endEl &&
+                endEl.dataset.lat &&
+                endEl.dataset.lng
+              ) {
+                const eLat = parseFloat(endEl.dataset.lat);
+                const eLng = parseFloat(endEl.dataset.lng);
+                if (isFinite(eLat) && isFinite(eLng)) {
+                  const distToEnd = distanceMeters({ lat, lng }, { lat: eLat, lng: eLng });
+                  if (distToEnd <= ARRIVAL_THRESHOLD_M) {
+                    reachedDestination = true;
+                    // Xóa tuyến đường khỏi bản đồ
+                    if (routeLine) {
+                      removeLayerIfExists(routeLine);
+                      routeLine = null;
+                    }
+                    if (endMarker) {
+                      removeLayerIfExists(endMarker);
+                      endMarker = null;
+                    }
+                    if (routeInfoEl) routeInfoEl.innerHTML = "";
+                    // Dừng giọng nói dẫn đường
+                    if (window.VoiceNav && typeof window.VoiceNav.stopVoiceNav === "function") {
+                      window.VoiceNav.stopVoiceNav();
+                    }
+                    showCenterNotice("Bạn đã đến nơi!", "success");
+                  }
+                }
+              }
+
+              // ---- Cập nhật giọng nói dẫn đường theo GPS ----
+              if (
+                !reachedDestination &&
+                window.VoiceNav &&
+                typeof window.VoiceNav.updateVoiceNav === "function"
+              ) {
                 window.VoiceNav.updateVoiceNav(lat, lng);
               }
 
-              // Pan map về vị trí khi nhận vị trí đầu tiên
+              // ---- Pan map về vị trí khi nhận vị trí đầu tiên ----
               if (!_firstPositionReceived) {
                 _firstPositionReceived = true;
                 map.setView(ll, Math.max(map.getZoom(), 17));
@@ -955,7 +1019,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
               }
             },
-            { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
           );
         }
       });
@@ -1516,7 +1580,7 @@ document.addEventListener("DOMContentLoaded", function () {
       window.startTrackingBlink();
     if (typeof window._geoActive === "function") window._geoActive(true);
     // Biến lưu heading hiện tại (nếu có)
-    let heading = 0;
+    let heading = lastHeadingDeg || 0;
     // Lắng nghe sự kiện orientation từ thiết bị (nếu có)
     function handleOrientation(event) {
       let compassHeading = null;
@@ -1529,12 +1593,16 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (compassHeading !== null) {
         heading = compassHeading;
-        lastHeadingDeg = heading;
+        lastHeadingDeg = heading; // cập nhật heading toàn cục từ la bàn
         orientationActive = true;
+        // Chỉ rebuild icon khi thay đổi đáng kể (>5°)
         if (userLocationMarker) {
-          userLocationMarker.setIcon(buildUserHeadingIcon(heading));
+          const prevH = userLocationMarker._lastHeadingDeg;
+          if (prevH === undefined || Math.abs(normalizeHeading(heading) - normalizeHeading(prevH)) > 5) {
+            userLocationMarker.setIcon(buildUserHeadingIcon(heading));
+            userLocationMarker._lastHeadingDeg = heading;
+          }
         }
-        console.log("[Orientation] heading:", heading);
       }
     }
     // Đăng ký lắng nghe orientation nếu có hỗ trợ
@@ -1572,15 +1640,17 @@ document.addEventListener("DOMContentLoaded", function () {
           showCenterNotice("Bạn đang ở ngoài khu vực bản đồ!", "warn");
         }
         // Nếu có heading từ orientation thì dùng, nếu không thì tính hướng di chuyển
-        let markerHeading = null;
+        let markerHeading;
         if (orientationActive && typeof heading === "number") {
+          // La bàn đang hoạt động: không ghi đè bằng heading di chuyển
           markerHeading = heading;
         } else if (prevUserLatLng) {
-          markerHeading = computeBearing(prevUserLatLng, { lat, lng });
+          const movBearing = computeBearing(prevUserLatLng, { lat, lng });
+          markerHeading = movBearing !== null ? movBearing : (lastHeadingDeg || 0);
+          lastHeadingDeg = markerHeading;
         } else {
-          markerHeading = 0;
+          markerHeading = lastHeadingDeg || 0;
         }
-        lastHeadingDeg = markerHeading;
         console.log(
           "[Geolocation] lat:",
           lat,
@@ -1608,7 +1678,10 @@ document.addEventListener("DOMContentLoaded", function () {
         programmaticUpdate = false;
 
         // Cập nhật giọng nói dẫn đường theo GPS
-        if (window.VoiceNav && typeof window.VoiceNav.updateVoiceNav === "function") {
+        if (
+          window.VoiceNav &&
+          typeof window.VoiceNav.updateVoiceNav === "function"
+        ) {
           window.VoiceNav.updateVoiceNav(lat, lng);
         }
 
@@ -2086,6 +2159,13 @@ document.addEventListener("DOMContentLoaded", function () {
         lat: 10.421582,
         lng: 105.64424,
         description: "Lao động",
+      },
+      {
+        id: "congchinh",
+        name: "Cổng chính",
+        lat: 10.419847,
+        lng: 105.643041,
+        description: "Cổng chính",
       },
     ];
 
@@ -2836,7 +2916,10 @@ document.addEventListener("DOMContentLoaded", function () {
     renderRouteInfo({ distance: dist, duration: dur });
 
     // Bắt đầu giọng nói dẫn đường
-    if (window.VoiceNav && typeof window.VoiceNav.startVoiceNav === "function") {
+    if (
+      window.VoiceNav &&
+      typeof window.VoiceNav.startVoiceNav === "function"
+    ) {
       window.VoiceNav.startVoiceNav(coords);
     }
     if (startMarker) {
@@ -3571,7 +3654,10 @@ guardedFindRoute = async function () {
         renderRouteInfo({ distance: meters, duration: meters / 1.2 });
 
       // Bắt đầu giọng nói dẫn đường
-      if (window.VoiceNav && typeof window.VoiceNav.startVoiceNav === "function") {
+      if (
+        window.VoiceNav &&
+        typeof window.VoiceNav.startVoiceNav === "function"
+      ) {
         window.VoiceNav.startVoiceNav(reduced.map((p) => [p[0], p[1]]));
       }
     } catch (err) {

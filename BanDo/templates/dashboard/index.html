@@ -132,7 +132,7 @@
                                         <tbody>
                                             <tr>
                                                 <td class="text-white-50 py-2">Số người tham gia:</td>
-                                                <td class="fw-bold text-end text-primary">{{ uat_report.participants_count }} sinh viên & GV</td>
+                                                <td class="fw-bold text-end text-primary">{{ uat_report.participants_count }} sinh viên &amp; GV</td>
                                             </tr>
                                             <tr>
                                                 <td class="text-white-50 py-2">Tỷ lệ hoàn thành tác vụ:</td>
@@ -220,7 +220,7 @@
             data: {
                 labels: ['1★', '2★', '3★', '4★', '5★'],
                 datasets: [{
-                    data: {{ ratings|safe }},
+                    data: JSON.parse('{{ ratings|safe }}'),
                     backgroundColor: ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#22c55e'],
                     borderWidth: 0
                 }]
@@ -238,7 +238,7 @@
         });
 
         // Weekly route searches Chart
-        const routesOverTime = {{ routes_over_time|safe }};
+        const routesOverTime = JSON.parse('{{ routes_over_time|safe }}');
         const labels = routesOverTime.map(item => item.day);
         const counts = routesOverTime.map(item => item.count);
 

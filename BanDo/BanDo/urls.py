@@ -24,7 +24,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.accounts.views import RegisterView, UserProfileView, UserViewSet
 from apps.locations.views import CategoryViewSet, LocationViewSet, RouteNodeViewSet, RouteEdgeViewSet
-from apps.routes.views import RouteViewSet, CalculateRouteView
+from apps.routes.views import RouteViewSet, CalculateRouteView, RecalculateRouteView
 from apps.history.views import SearchHistoryViewSet, GPSHistoryViewSet
 from apps.feedback.views import FeedbackViewSet, ReportViewSet
 from apps.notifications.views import NotificationViewSet
@@ -65,8 +65,9 @@ urlpatterns = [
     path('api/auth/refresh', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/profile', UserProfileView.as_view(), name='auth-profile'),
     
-    # Pathfinding API endpoint
+    # Pathfinding API endpoints
     path('api/routes/calculate', CalculateRouteView.as_view(), name='api-route-calculate'),
+    path('api/routes/recalculate', RecalculateRouteView.as_view(), name='api-route-recalculate'),
 ]
 
 if settings.DEBUG:

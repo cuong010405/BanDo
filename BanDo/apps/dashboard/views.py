@@ -142,6 +142,20 @@ def overview(request):
 
     # Weekly calculated route count
     routes_over_time = Route.objects.extra(select={'day': "date(created_at)"}).values('day').annotate(count=Count('id')).order_by('-day')[:7]
+    
+    import json
+    routes_data = []
+    for item in routes_over_time:
+        day_val = item['day']
+        if hasattr(day_val, 'strftime'):
+            day_str = day_val.strftime('%d/%m')
+        else:
+            day_str = str(day_val)
+        routes_data.append({
+            'day': day_str,
+            'count': item['count']
+        })
+    routes_json = json.dumps(list(reversed(routes_data)))
 
     context = {
         'total_users': total_users,
@@ -151,8 +165,8 @@ def overview(request):
         'avg_latency_ms': avg_latency_ms,
         'avg_gps_accuracy': avg_gps_accuracy,
         'recent_activities': recent_activities,
-        'ratings': ratings,
-        'routes_over_time': list(reversed(routes_over_time)),
+        'ratings': json.dumps(ratings),
+        'routes_over_time': routes_json,
         'uat_report': uat_report,
     }
     return render(request, 'dashboard/index.html', context)

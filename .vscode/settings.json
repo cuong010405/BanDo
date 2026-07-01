@@ -1,3 +1,9 @@
 {
-    "codium.codeCompletion.enable": false
+    "codium.codeCompletion.enable": false,
+    "python.analysis.extraPaths": [
+        "./BanDo/apps"
+    ],
+    "python.autoComplete.extraPaths": [
+        "./BanDo/apps"
+    ]
 }

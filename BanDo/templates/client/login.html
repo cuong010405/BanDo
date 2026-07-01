@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Đăng nhập - Bản đồ DTHU{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-center min-vh-100 bg-dark-gradient py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="card glass-card shadow-lg border-0 text-white rounded-4 overflow-hidden">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <div class="brand-icon-container mb-3 d-inline-block">
+                                <i class="fa-solid fa-map-location-dot fa-3x text-primary animate-pulse"></i>
+                            </div>
+                            <h2 class="fw-bold mb-1">Hệ thống Bản đồ</h2>
+                            <p class="text-white-50">Đăng nhập tài khoản của bạn</p>
+                        </div>
+                        
+                        <form method="POST" action="{% url 'client:login' %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label for="username" class="form-label text-white-50 small">Tên đăng nhập</label>
+                                <div class="input-group glass-input-group">
+                                    <span class="input-group-text"><i class="fa-solid fa-user text-white-50"></i></span>
+                                    <input type="text" class="form-control" id="username" name="username" placeholder="Nhập tên đăng nhập" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label for="password" class="form-label text-white-50 small">Mật khẩu</label>
+                                <div class="input-group glass-input-group">
+                                    <span class="input-group-text"><i class="fa-solid fa-lock text-white-50"></i></span>
+                                    <input type="password" class="form-control" id="password" name="password" placeholder="Nhập mật khẩu" required>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary w-100 rounded-pill py-2 fw-semibold shadow mb-3 btn-hover-effect">
+                                Đăng nhập
+                            </button>
+                        </form>
+                        
+                        <div class="text-center mt-4">
+                            <span class="text-white-50 small">Chưa có tài khoản? </span>
+                            <a href="{% url 'client:register' %}" class="text-primary fw-semibold text-decoration-none small">Đăng ký ngay</a>
+                        </div>
+                        <div class="text-center mt-3">
+                            <a href="{% url 'client:giao_dien_chinh' %}" class="text-white-50 text-decoration-none small"><i class="fa-solid fa-arrow-left me-1"></i> Quay về Bản đồ</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

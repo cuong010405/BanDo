@@ -1,0 +1,377 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load l10n %}
+
+{% block title %}Quản lý Địa điểm - DTHU Dashboard{% endblock %}
+
+{% block content %}
+{% localize off %}
+<div class="bo-cuc-chinh d-flex flex-column vh-100 bg-dark text-white overflow-hidden">
+    <!-- Navbar Header -->
+    <header class="navbar navbar-dark bg-glass-dark border-bottom border-secondary px-4 py-2 flex-shrink-0 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'client:giao_dien_chinh' %}" class="btn btn-sm btn-outline-secondary rounded-pill me-2"><i class="fa-solid fa-arrow-left me-1"></i>Bản đồ</a>
+            <span class="navbar-brand m-0 text-white fw-bold d-flex align-items-center gap-2">
+                <i class="fa-solid fa-gauge text-primary"></i> DTHU DASHBOARD
+            </span>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="small text-success"><i class="fa-solid fa-user-shield me-1"></i>Quản trị viên: {{ request.user.username }}</span>
+            <a href="{% url 'client:logout' %}" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="fa-solid fa-right-from-bracket me-1"></i>Đăng xuất</a>
+        </div>
+    </header>
+
+    <!-- Workspace -->
+    <div class="d-flex flex-grow-1 overflow-hidden">
+        <!-- Sidebar -->
+        <nav class="sidebar bg-glass-dark border-end border-secondary flex-shrink-0 p-3 overflow-y-auto" style="width: 250px;">
+            <div class="list-group list-group-flush rounded-3">
+                <a href="{% url 'dashboard:overview' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-chart-pie me-2 text-primary"></i>Tổng quan
+                </a>
+                <a href="{% url 'dashboard:locations' %}" class="list-group-item list-group-item-action bg-primary text-white border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-location-dot me-2"></i>Quản lý địa điểm
+                </a>
+                <a href="{% url 'dashboard:routes' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-circle-nodes me-2 text-primary"></i>Mạng lưới đường đi
+                </a>
+                <a href="{% url 'dashboard:users' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-users me-2 text-primary"></i>Quản lý tài khoản
+                </a>
+                <a href="{% url 'dashboard:feedbacks' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-comments me-2 text-primary"></i>Quản lý phản hồi
+                </a>
+                <a href="{% url 'dashboard:notifications' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-bell me-2 text-primary"></i>Gửi thông báo
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Workspace -->
+        <main class="flex-grow-1 d-flex overflow-hidden">
+            <!-- Left Panel: Table Lists -->
+            <div class="w-50 h-100 p-4 border-end border-secondary d-flex flex-column overflow-hidden">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="fw-bold m-0">Quản lý địa điểm</h4>
+                    <button class="btn btn-primary rounded-pill btn-sm" onclick="resetFormForCreate()"><i class="fa-solid fa-plus me-1"></i>Thêm địa điểm</button>
+                </div>
+
+                <!-- Search & Filters -->
+                <form method="GET" class="row g-2 mb-3">
+                    <div class="col-6">
+                        <input type="text" name="q" class="form-control form-control-sm bg-dark border-secondary text-white" placeholder="Tìm kiếm địa chỉ, tên..." value="{{ search_query }}">
+                    </div>
+                    <div class="col-4">
+                        <select name="category" class="form-select form-select-sm bg-dark border-secondary text-white">
+                            <option value="">-- Tất cả danh mục --</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat.id }}" {% if category_filter == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-2">
+                        <button type="submit" class="btn btn-sm btn-primary w-100 rounded-3"><i class="fa-solid fa-filter"></i> Lọc</button>
+                    </div>
+                </form>
+
+                <!-- DataTable -->
+                <div class="table-responsive flex-grow-1 border border-secondary rounded mb-3 bg-dark-card overflow-y-auto">
+                    <table class="table table-dark table-striped align-middle table-hover m-0 small">
+                        <thead>
+                            <tr class="table-active">
+                                <th>Tên</th>
+                                <th>Danh mục</th>
+                                <th>Vĩ độ (Lat)</th>
+                                <th>Kinh độ (Lng)</th>
+                                <th class="text-center">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for loc in page_obj %}
+                                <tr style="cursor: pointer;" onclick="loadLocationToForm('{{ loc.id }}', '{{ loc.name|escapejs }}', '{{ loc.category.id }}', '{{ loc.address|escapejs }}', '{{ loc.latitude }}', '{{ loc.longitude }}', '{{ loc.description|escapejs }}', {{ loc.is_active|yesno:'true,false' }})">
+                                    <td><strong>{{ loc.name }}</strong></td>
+                                    <td><span class="badge bg-secondary">{{ loc.category.name }}</span></td>
+                                    <td class="font-monospace">{{ loc.latitude|floatformat:6 }}</td>
+                                    <td class="font-monospace">{{ loc.longitude|floatformat:6 }}</td>
+                                    <td class="text-center" onclick="event.stopPropagation();">
+                                        <a href="{% url 'dashboard:delete_location' loc.id %}" class="text-danger" title="Xoá địa điểm" onclick="return confirm('Bạn thực sự muốn xoá địa điểm này?')">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-white-50">Không có địa điểm nào khớp kết quả.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <nav class="d-flex justify-content-between align-items-center">
+                    <span class="small text-white-50">Trang {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    <ul class="pagination pagination-sm m-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item"><a class="page-link bg-dark border-secondary text-white" href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&category={{ category_filter }}">&laquo; Trước</a></li>
+                        {% endif %}
+                        {% if page_obj.has_next %}
+                            <li class="page-item"><a class="page-link bg-dark border-secondary text-white" href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&category={{ category_filter }}">Tiếp &raquo;</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- Right Panel: Leaflet Map Overlay & Edit Forms -->
+            <div class="w-50 h-100 p-4 d-flex flex-column overflow-hidden">
+                <!-- Geocode address search bar using Nominatim API -->
+                <div class="card bg-dark-card border-secondary mb-3 rounded-3 shadow flex-shrink-0">
+                    <div class="card-body p-3">
+                        <label class="form-label text-white-50 small mb-2"><i class="fa-solid fa-magnifying-glass me-1"></i>Tìm kiếm & Định vị Địa chỉ (Nominatim API)</label>
+                        <div class="input-group">
+                            <input type="text" id="nominatim-search-input" class="form-control bg-dark border-secondary text-white" placeholder="Nhập địa chỉ cần tìm...">
+                            <button type="button" class="btn btn-outline-primary" onclick="searchAddressNominatim()"><i class="fa-solid fa-search"></i> Định vị</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Leaflet editor map container -->
+                <div class="flex-grow-1 border border-secondary rounded mb-3 position-relative" style="min-height: 250px;">
+                    <div id="editor-map" class="w-100 h-100"></div>
+                </div>
+
+                <!-- Add/Edit form -->
+                <div class="card bg-dark-card border-secondary rounded-3 shadow flex-shrink-0">
+                    <div class="card-body p-3" style="max-height: 280px; overflow-y: auto;">
+                        <h6 id="form-title" class="fw-bold mb-3 text-primary"><i class="fa-solid fa-pen-to-square me-2"></i>Thêm địa điểm mới</h6>
+                        <form method="POST" enctype="multipart/form-data" action="{% url 'dashboard:locations' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="location">
+                            <input type="hidden" id="loc-id" name="id">
+
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-white-50 m-0">Tên địa điểm:</label>
+                                    <input type="text" id="loc-name" name="name" class="form-control form-control-sm bg-dark border-secondary text-white" required>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-white-50 m-0">Danh mục:</label>
+                                    <select id="loc-category" name="category" class="form-select form-select-sm bg-dark border-secondary text-white" required>
+                                        {% for cat in categories %}
+                                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label small text-white-50 m-0">Địa chỉ:</label>
+                                <input type="text" id="loc-address" name="address" class="form-control form-control-sm bg-dark border-secondary text-white">
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-white-50 m-0">Vĩ độ (Latitude):</label>
+                                    <input type="number" step="any" id="loc-lat" name="latitude" class="form-control form-control-sm bg-dark border-secondary text-white font-monospace" required>
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label small text-white-50 m-0">Kinh độ (Longitude):</label>
+                                    <input type="number" step="any" id="loc-lng" name="longitude" class="form-control form-control-sm bg-dark border-secondary text-white font-monospace" required>
+                                </div>
+                            </div>
+
+                            <div class="mb-2">
+                                <label class="form-label small text-white-50 m-0">Mô tả chi tiết:</label>
+                                <textarea id="loc-desc" name="description" class="form-control form-control-sm bg-dark border-secondary text-white" rows="2"></textarea>
+                            </div>
+
+                            <div class="row align-items-center mt-3">
+                                <div class="col-md-8">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="loc-active" name="is_active" checked>
+                                        <label class="form-check-label small text-white-50" for="loc-active">Đang hoạt động</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-4"><i class="fa-solid fa-floppy-disk me-1"></i>Lưu lại</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Raw Locations JSON database payload for script -->
+<script id="all-locations-json" type="application/json">
+[
+    {% for loc in all_locations %}
+    {
+        "id": {{ loc.id }},
+        "name": "{{ loc.name|escapejs }}",
+        "lat": {{ loc.latitude }},
+        "lng": {{ loc.longitude }},
+        "address": "{{ loc.address|escapejs }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+{% endlocalize %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let map, activeMarker;
+    let currentlyEditingId = null;
+    const staticMarkers = {};
+    const campusCenter = [10.4206, 105.6436];
+    
+    // Load pre-seeded locations from JSON Script tags
+    const dbLocations = JSON.parse(document.getElementById('all-locations-json').textContent);
+
+    document.addEventListener("DOMContentLoaded", function () {
+        // Initialize Map
+        map = L.map('editor-map', {
+            fullscreenControl: true
+        }).setView(campusCenter, 16);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Draw existing locations as static markers
+        dbLocations.forEach(loc => {
+            const m = L.circleMarker([loc.lat, loc.lng], {
+                radius: 6,
+                color: '#3b82f6',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.8
+            }).addTo(map);
+            m.bindTooltip(loc.name, { permanent: false, direction: 'top' });
+            staticMarkers[loc.id] = m; // Store reference
+        });
+
+        // Click map to set coordinates in form
+        map.on('click', function(e) {
+            const lat = e.latlng.lat;
+            const lng = e.latlng.lng;
+            updateMarkerPosition(lat, lng);
+        });
+    });
+
+    // Load table row details into Form
+    function loadLocationToForm(id, name, catId, address, lat, lng, desc, active) {
+        // Restore previously hidden marker
+        if (currentlyEditingId && staticMarkers[currentlyEditingId]) {
+            staticMarkers[currentlyEditingId].addTo(map);
+        }
+
+        currentlyEditingId = id;
+
+        // Hide static marker of the location being edited
+        if (staticMarkers[id]) {
+            map.removeLayer(staticMarkers[id]);
+        }
+
+        document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-pen-to-square me-2"></i>Chỉnh sửa địa điểm: ${name}`;
+        document.getElementById('loc-id').value = id;
+        document.getElementById('loc-name').value = name;
+        document.getElementById('loc-category').value = catId;
+        document.getElementById('loc-address').value = address;
+        document.getElementById('loc-lat').value = lat;
+        document.getElementById('loc-lng').value = lng;
+        document.getElementById('loc-desc').value = desc;
+        document.getElementById('loc-active').checked = active;
+
+        // Move map and marker
+        const latVal = parseFloat(lat);
+        const lngVal = parseFloat(lng);
+        map.setView([latVal, lngVal], 18);
+        updateMarkerPosition(latVal, lngVal, false); // place but don't focus since we just set view
+    }
+
+    // Reset inputs for a clean addition
+    function resetFormForCreate() {
+        // Restore hidden marker
+        if (currentlyEditingId && staticMarkers[currentlyEditingId]) {
+            staticMarkers[currentlyEditingId].addTo(map);
+        }
+        currentlyEditingId = null;
+
+        document.getElementById('form-title').innerHTML = `<i class="fa-solid fa-plus me-2"></i>Thêm địa điểm mới`;
+        document.getElementById('loc-id').value = '';
+        document.getElementById('loc-name').value = '';
+        document.getElementById('loc-address').value = '';
+        document.getElementById('loc-lat').value = '';
+        document.getElementById('loc-lng').value = '';
+        document.getElementById('loc-desc').value = '';
+        document.getElementById('loc-active').checked = true;
+
+        if (activeMarker) {
+            map.removeLayer(activeMarker);
+            activeMarker = null;
+        }
+        map.setView(campusCenter, 16);
+    }
+
+    // Place or move draggable marker
+    function updateMarkerPosition(lat, lng, centerMap = true) {
+        document.getElementById('loc-lat').value = parseFloat(lat).toFixed(6);
+        document.getElementById('loc-lng').value = parseFloat(lng).toFixed(6);
+
+        if (activeMarker) {
+            activeMarker.setLatLng([lat, lng]);
+        } else {
+            activeMarker = L.marker([lat, lng], {
+                draggable: true
+            }).addTo(map);
+
+            // Drag listener to update form coordinates
+            activeMarker.on('dragend', function(e) {
+                const position = activeMarker.getLatLng();
+                document.getElementById('loc-lat').value = position.lat.toFixed(6);
+                document.getElementById('loc-lng').value = position.lng.toFixed(6);
+            });
+        }
+
+        if (centerMap) {
+            map.setView([lat, lng], 18);
+        }
+    }
+
+    // Nominatim Geocoding API Address Search
+    async function searchAddressNominatim() {
+        const query = document.getElementById('nominatim-search-input').value.trim();
+        if (!query) {
+            alert('Vui lòng nhập địa chỉ cần tìm kiếm!');
+            return;
+        }
+
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+        try {
+            const response = await fetch(url, {
+                headers: { 'Accept-Language': 'vi,en;q=0.8' }
+            });
+            const data = await response.json();
+            
+            if (data.length > 0) {
+                const result = data[0];
+                const lat = parseFloat(result.lat);
+                const lon = parseFloat(result.lon);
+                
+                // Update inputs & map
+                document.getElementById('loc-address').value = result.display_name;
+                updateMarkerPosition(lat, lon);
+            } else {
+                alert('Không tìm thấy địa chỉ này trên bản đồ!');
+            }
+        } catch (error) {
+            console.error('Nominatim request failed', error);
+            alert('Lỗi kết nối đến dịch vụ bản đồ Nominatim.');
+        }
+    }
+</script>
+{% endblock %}

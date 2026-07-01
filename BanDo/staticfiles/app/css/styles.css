@@ -1,0 +1,220 @@
+/* Design System: Custom CSS Theme (Bootstrap Override) */
+
+:root {
+    --bg-dark-gradient: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+    --bg-glass-dark: rgba(15, 23, 42, 0.7);
+    --border-color: rgba(255, 255, 255, 0.08);
+    --primary-color: #3b82f6;
+    --primary-hover: #2563eb;
+    --success-color: #10b981;
+    --dark-card: rgba(30, 41, 59, 0.45);
+}
+
+body {
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #020617;
+    color: #f8fafc;
+}
+
+/* Background Utilities */
+.bg-dark-gradient {
+    background: var(--bg-dark-gradient);
+}
+
+.bg-glass-dark {
+    background: var(--bg-glass-dark);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.bg-dark-card {
+    background: var(--dark-card) !important;
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border-color) !important;
+}
+
+/* Sidebar Drawer Style */
+.sidebar-panel {
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.25);
+    border-color: var(--border-color) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom form and input styling */
+.form-control, .form-select {
+    background-color: rgba(15, 23, 42, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: #fff !important;
+    padding: 0.55rem 0.9rem;
+    font-size: 0.92rem;
+    border-radius: 8px;
+    transition: all 0.2s ease-in-out;
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: rgba(15, 23, 42, 0.8) !important;
+    border-color: var(--primary-color) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+}
+
+.input-group-text {
+    background-color: rgba(15, 23, 42, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Glassmorphism Auth Cards */
+.glass-card {
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Custom Nav Tab Styles */
+.nav-tabs .nav-link {
+    border-bottom: 2px solid transparent !important;
+    border-radius: 0;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    font-size: 0.88rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: transparent !important;
+    border-bottom-color: var(--primary-color) !important;
+    color: var(--primary-color) !important;
+    font-weight: 600;
+}
+
+.nav-tabs .nav-link:hover:not(.active) {
+    color: rgba(255, 255, 255, 0.8) !important;
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Custom list group hover */
+.list-item-poi {
+    transition: all 0.2s ease-in-out;
+}
+
+.list-item-poi:hover {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    transform: translateX(3px);
+}
+
+/* Buttons */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+    transition: all 0.2s ease-in-out;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.btn-hover-effect {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-hover-effect::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease-out, height 0.3s ease-out;
+}
+
+.btn-hover-effect:active::after {
+    width: 200%;
+    height: 200%;
+}
+
+/* Animations */
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.85; }
+}
+
+.animate-pulse {
+    animation: pulse 2.5s infinite ease-in-out;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.animate-spin.active {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+/* Leaflet Themed Popups */
+.leaflet-popup-content-wrapper {
+    background: rgba(15, 23, 42, 0.92) !important;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white !important;
+    border-radius: 12px !important;
+    padding: 3px !important;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4) !important;
+}
+
+.leaflet-popup-tip {
+    background: rgba(15, 23, 42, 0.92) !important;
+}
+
+/* Rating Stars selection */
+.rating-stars i.active {
+    font-weight: 900 !important;
+    color: #eab308 !important;
+}
+
+/* Dashboard Sidebar list hover */
+.hover-bg-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: white !important;
+}
+
+.card-hover-effect {
+    transition: all 0.3s ease;
+}
+
+.card-hover-effect:hover {
+    transform: translateY(-3px);
+    border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+/* Brighten inputs, readonly fields, placeholders, and card headers */
+.form-control[readonly], .form-control:disabled {
+    background-color: rgba(15, 23, 42, 0.6) !important;
+    color: #ffffff !important;
+    opacity: 1 !important;
+    -webkit-text-fill-color: #ffffff !important; /* Safari/iOS override */
+}
+
+.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.card-title {
+    color: #ffffff !important;
+}
+
+.nav-tabs .nav-link {
+    color: rgba(255, 255, 255, 0.6) !important;
+}
+

@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Quản lý Phản hồi - DTHU Dashboard{% endblock %}
+
+{% block content %}
+<div class="bo-cuc-chinh d-flex flex-column vh-100 bg-dark text-white overflow-hidden">
+    <!-- Navbar Header -->
+    <header class="navbar navbar-dark bg-glass-dark border-bottom border-secondary px-4 py-2 flex-shrink-0 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'client:giao_dien_chinh' %}" class="btn btn-sm btn-outline-secondary rounded-pill me-2"><i class="fa-solid fa-arrow-left me-1"></i>Bản đồ</a>
+            <span class="navbar-brand m-0 text-white fw-bold d-flex align-items-center gap-2">
+                <i class="fa-solid fa-gauge text-primary"></i> DTHU DASHBOARD
+            </span>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="small text-success"><i class="fa-solid fa-user-shield me-1"></i>Quản trị viên: {{ request.user.username }}</span>
+            <a href="{% url 'client:logout' %}" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="fa-solid fa-right-from-bracket me-1"></i>Đăng xuất</a>
+        </div>
+    </header>
+
+    <!-- Workspace -->
+    <div class="d-flex flex-grow-1 overflow-hidden">
+        <!-- Sidebar -->
+        <nav class="sidebar bg-glass-dark border-end border-secondary flex-shrink-0 p-3 overflow-y-auto" style="width: 250px;">
+            <div class="list-group list-group-flush rounded-3">
+                <a href="{% url 'dashboard:overview' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-chart-pie me-2 text-primary"></i>Tổng quan
+                </a>
+                <a href="{% url 'dashboard:locations' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-location-dot me-2 text-primary"></i>Quản lý địa điểm
+                </a>
+                <a href="{% url 'dashboard:routes' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-circle-nodes me-2 text-primary"></i>Mạng lưới đường đi
+                </a>
+                <a href="{% url 'dashboard:users' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-users me-2 text-primary"></i>Quản lý tài khoản
+                </a>
+                <a href="{% url 'dashboard:feedbacks' %}" class="list-group-item list-group-item-action bg-primary text-white border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-comments me-2"></i>Quản lý phản hồi
+                </a>
+                <a href="{% url 'dashboard:notifications' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-bell me-2 text-primary"></i>Gửi thông báo
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Workspace Scroll Area -->
+        <main class="flex-grow-1 p-4 overflow-y-auto">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="fw-bold m-0">Quản lý phản hồi & góp ý</h2>
+                <div class="p-3 bg-dark-card border border-secondary rounded-3 shadow d-flex align-items-center gap-3">
+                    <div class="p-2 bg-warning bg-opacity-25 rounded-3 text-warning"><i class="fa-solid fa-star fa-lg"></i></div>
+                    <div>
+                        <span class="text-white-50 small d-block">Điểm đánh giá trung bình</span>
+                        <h4 class="fw-bold m-0">{{ avg_rating }} / 5.0 ★</h4>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feedbacks Table -->
+            <div class="card bg-dark-card border-secondary rounded-3 shadow mb-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-striped align-middle table-hover m-0 small">
+                            <thead>
+                                <tr class="table-active">
+                                    <th>Người gửi</th>
+                                    <th>Tiêu đề</th>
+                                    <th>Nội dung góp ý</th>
+                                    <th class="text-center">Đánh giá</th>
+                                    <th>Phản hồi của Admin</th>
+                                    <th>Ngày gửi</th>
+                                    <th class="text-center">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for fb in page_obj %}
+                                    <tr>
+                                        <td><strong>{{ fb.user.username }}</strong></td>
+                                        <td>{{ fb.subject }}</td>
+                                        <td style="max-width: 250px; text-overflow: ellipsis; overflow: hidden;" title="{{ fb.message }}">{{ fb.message }}</td>
+                                        <td class="text-center text-warning fw-semibold font-monospace">{{ fb.rating }} ★</td>
+                                        <td>
+                                            {% if fb.response %}
+                                                <span class="text-success small"><i class="fa-solid fa-reply me-1"></i>{{ fb.response }}</span>
+                                            {% else %}
+                                                <span class="text-white-50 small"><i>Chưa có phản hồi</i></span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ fb.created_at|date:"d/m/Y H:i" }}</td>
+                                        <td class="text-center">
+                                            <button class="btn btn-xs btn-outline-primary rounded-pill px-3" style="font-size: 11px;" 
+                                                    onclick="openReplyModal('{{ fb.id }}', '{{ fb.user.username|escapejs }}', '{{ fb.message|escapejs }}', '{{ fb.response|escapejs }}')">
+                                                <i class="fa-solid fa-reply me-1"></i>Phản hồi
+                                            </button>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="7" class="text-center text-white-50 py-3">Không có ý kiến phản hồi nào.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <nav class="d-flex justify-content-between align-items-center">
+                <span class="small text-white-50">Trang {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                <ul class="pagination pagination-sm m-0">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link bg-dark border-secondary text-white" href="?page={{ page_obj.previous_page_number }}">&laquo; Trước</a></li>
+                    {% endif %}
+                    {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link bg-dark border-secondary text-white" href="?page={{ page_obj.next_page_number }}">Tiếp &raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </main>
+    </div>
+</div>
+
+<!-- Modal response form -->
+<div class="modal fade" id="replyModal" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-glass-dark border border-secondary text-white">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title fw-bold" id="replyModalLabel"><i class="fa-solid fa-reply me-2 text-primary"></i>Phản hồi góp ý</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="reply-form" method="POST" action="">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p class="small text-white-50 mb-1">Góp ý từ người dùng <strong id="modal-user" class="text-white">--</strong>:</p>
+                    <div id="modal-msg" class="p-3 bg-dark rounded border border-secondary small mb-3 text-white-50 text-wrap">--</div>
+                    
+                    <div class="mb-3">
+                        <label for="response-text" class="form-label small text-white-50">Nội dung phản hồi từ Admin:</label>
+                        <textarea class="form-control bg-dark border-secondary text-white" id="response-text" name="response" rows="4" required placeholder="Nhập câu trả lời..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4"><i class="fa-solid fa-paper-plane me-1"></i>Gửi phản hồi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let replyModal;
+    
+    document.addEventListener("DOMContentLoaded", function () {
+        replyModal = new bootstrap.Modal(document.getElementById('replyModal'));
+    });
+
+    function openReplyModal(id, username, msg, existingResponse) {
+        document.getElementById('modal-user').innerText = username;
+        document.getElementById('modal-msg').innerText = msg;
+        document.getElementById('response-text').value = existingResponse;
+        
+        // Dynamic action URL
+        const form = document.getElementById('reply-form');
+        form.action = `/dashboard/feedbacks/reply/${id}/`;
+        
+        replyModal.show();
+    }
+</script>
+{% endblock %}

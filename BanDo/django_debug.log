@@ -1,0 +1,512 @@
+WARNING 2026-07-01 09:32:09,070 log 10648 23600 Not Found: /favicon.ico
+WARNING 2026-07-01 09:32:09,071 basehttp 10648 23600 "GET /favicon.ico HTTP/1.1" 404 4617
+WARNING 2026-07-01 09:41:31,586 log 31280 24504 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 09:41:31,587 basehttp 31280 24504 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 09:45:03,022 log 31280 19720 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 09:45:03,024 basehttp 31280 19720 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+ERROR 2026-07-01 09:45:41,449 log 31280 24504 Internal Server Error: /api/routes/calculate
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\views\decorators\csrf.py", line 65, in _view_wrapper
+    return view_func(request, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\views\generic\base.py", line 105, in view
+    return self.dispatch(request, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\rest_framework\views.py", line 498, in dispatch
+    request = self.initialize_request(request, *args, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\rest_framework\views.py", line 400, in initialize_request
+    authenticators=self.get_authenticators(),
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\rest_framework\views.py", line 278, in get_authenticators
+    return [auth() for auth in self.authentication_classes]
+            ^^^^^^
+TypeError: MiddlewareMixin.__init__() missing 1 required positional argument: 'get_response'
+ERROR 2026-07-01 09:45:41,463 basehttp 31280 24504 "POST /api/routes/calculate HTTP/1.1" 500 91129
+WARNING 2026-07-01 09:48:45,024 log 30348 2532 Not Found: /api/routes/calculate
+WARNING 2026-07-01 09:48:45,025 basehttp 30348 2532 "POST /api/routes/calculate HTTP/1.1" 404 54
+WARNING 2026-07-01 09:56:17,754 log 30348 31820 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 09:56:17,755 basehttp 30348 31820 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 09:56:24,488 log 30348 31820 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 09:56:24,490 basehttp 30348 31820 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 09:56:33,441 log 30348 31820 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 09:56:33,442 basehttp 30348 31820 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 09:57:13,449 log 30348 31820 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 09:57:13,450 basehttp 30348 31820 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 09:57:41,554 log 30348 31820 Not Found: /api/routes/calculate
+WARNING 2026-07-01 09:57:41,556 basehttp 30348 31820 "POST /api/routes/calculate HTTP/1.1" 404 54
+WARNING 2026-07-01 09:57:44,770 log 30348 31820 Not Found: /api/routes/calculate
+WARNING 2026-07-01 09:57:44,772 basehttp 30348 31820 "POST /api/routes/calculate HTTP/1.1" 404 54
+WARNING 2026-07-01 09:57:50,579 log 30348 31820 Not Found: /api/routes/calculate
+WARNING 2026-07-01 09:57:50,581 basehttp 30348 31820 "POST /api/routes/calculate HTTP/1.1" 404 54
+WARNING 2026-07-01 09:58:33,987 log 30348 31820 Not Found: /api/routes/calculate
+WARNING 2026-07-01 09:58:33,989 basehttp 30348 31820 "POST /api/routes/calculate HTTP/1.1" 404 54
+WARNING 2026-07-01 10:01:07,334 log 30348 14644 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:01:07,335 basehttp 30348 14644 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:01:49,374 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:01:49,375 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:01:55,888 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:01:55,890 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:01:57,052 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:01:57,054 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:01:58,583 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:01:58,584 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:01:59,483 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:01:59,484 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:01:59,843 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:01:59,844 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:02:02,365 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:02:02,366 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:02:04,411 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:02:04,412 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:02:04,814 log 11712 11048 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:02:04,815 basehttp 11712 11048 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:16:42,613 log 14884 17260 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:16:42,614 basehttp 14884 17260 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:17:32,398 log 14884 17260 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:17:32,399 basehttp 14884 17260 "POST /api/history/gps/ HTTP/1.1" 401 58
+ERROR 2026-07-01 10:33:35,965 log 14884 30000 Internal Server Error: /dashboard/locations/
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 511, in parse
+    compile_func = self.tags[command]
+                   ~~~~~~~~~^^^^^^^^^
+KeyError: 'endblock'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Khoahoc\BanDo\apps\dashboard\views.py", line 240, in locations
+    return render(request, 'dashboard/locations.html', context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\backends\django.py", line 79, in get_template
+    return Template(self.engine.get_template(template_name), self)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 177, in get_template
+    template, origin = self.find_template(template_name)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 159, in find_template
+    template = loader.get_template(name, skip=skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\base.py", line 28, in get_template
+    return Template(
+           ^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 155, in __init__
+    self.nodelist = self.compile_nodelist()
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 197, in compile_nodelist
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 299, in do_extends
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 234, in do_block
+    nodelist = parser.parse(("endblock",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\templatetags\l10n.py", line 58, in localize_tag
+    nodelist = parser.parse(("endlocalize",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 513, in parse
+    self.invalid_block_tag(token, command, parse_until)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 568, in invalid_block_tag
+    raise self.error(
+django.template.exceptions.TemplateSyntaxError: Invalid block tag on line 223: 'endblock', expected 'endlocalize'. Did you forget to register or load this tag?
+ERROR 2026-07-01 10:33:35,983 basehttp 14884 30000 "GET /dashboard/locations/ HTTP/1.1" 500 219630
+ERROR 2026-07-01 10:33:37,306 log 14884 30000 Internal Server Error: /dashboard/locations/
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 511, in parse
+    compile_func = self.tags[command]
+                   ~~~~~~~~~^^^^^^^^^
+KeyError: 'endblock'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Khoahoc\BanDo\apps\dashboard\views.py", line 240, in locations
+    return render(request, 'dashboard/locations.html', context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\backends\django.py", line 79, in get_template
+    return Template(self.engine.get_template(template_name), self)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 177, in get_template
+    template, origin = self.find_template(template_name)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 159, in find_template
+    template = loader.get_template(name, skip=skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\base.py", line 28, in get_template
+    return Template(
+           ^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 155, in __init__
+    self.nodelist = self.compile_nodelist()
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 197, in compile_nodelist
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 299, in do_extends
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 234, in do_block
+    nodelist = parser.parse(("endblock",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\templatetags\l10n.py", line 58, in localize_tag
+    nodelist = parser.parse(("endlocalize",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 513, in parse
+    self.invalid_block_tag(token, command, parse_until)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 568, in invalid_block_tag
+    raise self.error(
+django.template.exceptions.TemplateSyntaxError: Invalid block tag on line 223: 'endblock', expected 'endlocalize'. Did you forget to register or load this tag?
+ERROR 2026-07-01 10:33:37,320 basehttp 14884 30000 "GET /dashboard/locations/ HTTP/1.1" 500 219630
+ERROR 2026-07-01 10:34:01,967 log 14884 30000 Internal Server Error: /dashboard/locations/
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 511, in parse
+    compile_func = self.tags[command]
+                   ~~~~~~~~~^^^^^^^^^
+KeyError: 'endblock'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Khoahoc\BanDo\apps\dashboard\views.py", line 240, in locations
+    return render(request, 'dashboard/locations.html', context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\backends\django.py", line 79, in get_template
+    return Template(self.engine.get_template(template_name), self)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 177, in get_template
+    template, origin = self.find_template(template_name)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 159, in find_template
+    template = loader.get_template(name, skip=skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\base.py", line 28, in get_template
+    return Template(
+           ^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 155, in __init__
+    self.nodelist = self.compile_nodelist()
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 197, in compile_nodelist
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 299, in do_extends
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 234, in do_block
+    nodelist = parser.parse(("endblock",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\templatetags\l10n.py", line 58, in localize_tag
+    nodelist = parser.parse(("endlocalize",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 513, in parse
+    self.invalid_block_tag(token, command, parse_until)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 568, in invalid_block_tag
+    raise self.error(
+django.template.exceptions.TemplateSyntaxError: Invalid block tag on line 223: 'endblock', expected 'endlocalize'. Did you forget to register or load this tag?
+ERROR 2026-07-01 10:34:01,979 basehttp 14884 30000 "GET /dashboard/locations/ HTTP/1.1" 500 219630
+ERROR 2026-07-01 10:34:02,847 log 14884 30000 Internal Server Error: /dashboard/locations/
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 511, in parse
+    compile_func = self.tags[command]
+                   ~~~~~~~~~^^^^^^^^^
+KeyError: 'endblock'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Khoahoc\BanDo\apps\dashboard\views.py", line 240, in locations
+    return render(request, 'dashboard/locations.html', context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\backends\django.py", line 79, in get_template
+    return Template(self.engine.get_template(template_name), self)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 177, in get_template
+    template, origin = self.find_template(template_name)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 159, in find_template
+    template = loader.get_template(name, skip=skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\base.py", line 28, in get_template
+    return Template(
+           ^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 155, in __init__
+    self.nodelist = self.compile_nodelist()
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 197, in compile_nodelist
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 299, in do_extends
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 234, in do_block
+    nodelist = parser.parse(("endblock",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\templatetags\l10n.py", line 58, in localize_tag
+    nodelist = parser.parse(("endlocalize",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 513, in parse
+    self.invalid_block_tag(token, command, parse_until)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 568, in invalid_block_tag
+    raise self.error(
+django.template.exceptions.TemplateSyntaxError: Invalid block tag on line 223: 'endblock', expected 'endlocalize'. Did you forget to register or load this tag?
+ERROR 2026-07-01 10:34:02,858 basehttp 14884 30000 "GET /dashboard/locations/ HTTP/1.1" 500 219630
+ERROR 2026-07-01 10:34:03,054 log 14884 30000 Internal Server Error: /dashboard/locations/
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 511, in parse
+    compile_func = self.tags[command]
+                   ~~~~~~~~~^^^^^^^^^
+KeyError: 'endblock'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\base.py", line 197, in _get_response
+    response = wrapped_callback(request, *callback_args, **callback_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\Desktop\Khoahoc\BanDo\apps\dashboard\views.py", line 240, in locations
+    return render(request, 'dashboard/locations.html', context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\shortcuts.py", line 25, in render
+    content = loader.render_to_string(template_name, context, request, using=using)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 61, in render_to_string
+    template = get_template(template_name, using=using)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader.py", line 15, in get_template
+    return engine.get_template(template_name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\backends\django.py", line 79, in get_template
+    return Template(self.engine.get_template(template_name), self)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 177, in get_template
+    template, origin = self.find_template(template_name)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\engine.py", line 159, in find_template
+    template = loader.get_template(name, skip=skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\cached.py", line 57, in get_template
+    template = super().get_template(template_name, skip)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loaders\base.py", line 28, in get_template
+    return Template(
+           ^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 155, in __init__
+    self.nodelist = self.compile_nodelist()
+                    ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 197, in compile_nodelist
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 299, in do_extends
+    nodelist = parser.parse()
+               ^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\loader_tags.py", line 234, in do_block
+    nodelist = parser.parse(("endblock",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 519, in parse
+    raise self.error(token, e)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 517, in parse
+    compiled_result = compile_func(self, token)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\templatetags\l10n.py", line 58, in localize_tag
+    nodelist = parser.parse(("endlocalize",))
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 513, in parse
+    self.invalid_block_tag(token, command, parse_until)
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\template\base.py", line 568, in invalid_block_tag
+    raise self.error(
+django.template.exceptions.TemplateSyntaxError: Invalid block tag on line 223: 'endblock', expected 'endlocalize'. Did you forget to register or load this tag?
+ERROR 2026-07-01 10:34:03,065 basehttp 14884 30000 "GET /dashboard/locations/ HTTP/1.1" 500 219630
+WARNING 2026-07-01 10:44:14,624 log 14884 18660 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:44:14,625 basehttp 14884 18660 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 10:48:09,150 log 14884 18660 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 10:48:09,151 basehttp 14884 18660 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 10:48:10,716 log 14884 31780 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 10:48:10,717 basehttp 14884 31780 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 10:52:22,987 log 14884 31780 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 10:52:22,988 basehttp 14884 31780 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:01:53,252 log 14884 21692 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:01:53,255 basehttp 14884 21692 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 11:01:54,581 log 14884 32664 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:01:54,583 basehttp 14884 32664 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 11:02:02,015 log 14884 32664 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:02:02,016 basehttp 14884 32664 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:02:06,828 log 14884 32664 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:02:06,829 basehttp 14884 32664 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:02:07,272 log 14884 32664 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:02:07,273 basehttp 14884 32664 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:02:11,001 log 14884 32664 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:02:11,002 basehttp 14884 32664 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:04:04,097 log 14884 32664 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:04:04,099 basehttp 14884 32664 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:04:11,516 log 14884 32664 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:04:11,518 basehttp 14884 32664 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:09:40,449 log 14884 3956 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:09:40,451 basehttp 14884 3956 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:09:46,967 log 14884 3956 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:09:46,969 basehttp 14884 3956 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:10:34,817 log 17492 12868 Unauthorized: /api/history/gps/
+WARNING 2026-07-01 11:10:34,821 basehttp 17492 12868 "POST /api/history/gps/ HTTP/1.1" 401 58
+WARNING 2026-07-01 11:10:49,153 log 17492 4668 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:10:49,154 basehttp 17492 4668 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 11:10:59,966 log 17492 12868 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:10:59,967 basehttp 17492 12868 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 11:16:24,592 log 17492 14536 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:16:24,593 basehttp 17492 14536 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 11:17:21,379 log 17492 28380 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:17:21,380 basehttp 17492 28380 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 11:17:45,474 log 17492 28380 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:17:45,476 basehttp 17492 28380 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 11:52:13,831 log 24276 6984 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:52:13,833 basehttp 24276 6984 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882
+WARNING 2026-07-01 11:52:14,742 log 24276 29108 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-01 11:52:14,745 basehttp 24276 29108 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 4882

@@ -854,3 +854,53 @@ WARNING 2026-07-01 14:12:45,405 log 14592 21204 Not Found: /.well-known/appspeci
 WARNING 2026-07-01 14:12:45,406 basehttp 14592 21204 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 5077
 WARNING 2026-07-01 14:12:46,390 log 14592 21204 Not Found: /.well-known/appspecific/com.chrome.devtools.json
 WARNING 2026-07-01 14:12:46,392 basehttp 14592 21204 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 5077
+WARNING 2026-07-08 19:18:57,899 log 24288 11220 Not Found: /api/routes/calculate
+WARNING 2026-07-08 19:18:57,902 basehttp 24288 11220 "POST /api/routes/calculate HTTP/1.1" 404 69
+WARNING 2026-07-08 19:19:02,983 log 24288 11220 Not Found: /api/routes/calculate
+WARNING 2026-07-08 19:19:02,985 basehttp 24288 11220 "POST /api/routes/calculate HTTP/1.1" 404 69
+WARNING 2026-07-08 19:19:03,766 log 24288 11220 Not Found: /api/routes/calculate
+WARNING 2026-07-08 19:19:03,769 basehttp 24288 11220 "POST /api/routes/calculate HTTP/1.1" 404 69
+WARNING 2026-07-08 20:27:10,801 log 16960 11448 Not Found: /api/routes/calculate
+WARNING 2026-07-08 20:27:10,805 basehttp 16960 11448 "POST /api/routes/calculate HTTP/1.1" 404 69
+WARNING 2026-07-10 12:01:33,817 log 28272 25836 Not Found: /admin/auth/user/
+WARNING 2026-07-10 12:01:33,822 basehttp 28272 25836 "GET /admin/auth/user/ HTTP/1.1" 404 5329
+WARNING 2026-07-11 12:58:08,183 log 14620 23228 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-11 12:58:08,187 basehttp 14620 23228 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 5077
+WARNING 2026-07-11 13:32:07,259 log 14620 6576 Not Found: /api/routes/calculate
+WARNING 2026-07-11 13:32:07,260 basehttp 14620 6576 "POST /api/routes/calculate HTTP/1.1" 404 45
+WARNING 2026-07-11 13:48:50,178 log 14620 19216 Not Found: /api/routes/calculate
+WARNING 2026-07-11 13:48:50,180 basehttp 14620 19216 "POST /api/routes/calculate HTTP/1.1" 404 45
+ERROR 2026-07-11 13:53:31,631 log 20016 17468 Invalid HTTP_HOST header: 'testserver'. You may need to add 'testserver' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\utils\deprecation.py", line 119, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\http\request.py", line 203, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: 'testserver'. You may need to add 'testserver' to ALLOWED_HOSTS.
+ERROR 2026-07-11 16:15:15,587 log 23556 23672 Invalid HTTP_HOST header: 'testserver'. You may need to add 'testserver' to ALLOWED_HOSTS.
+Traceback (most recent call last):
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\core\handlers\exception.py", line 55, in inner
+    response = get_response(request)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\utils\deprecation.py", line 119, in __call__
+    response = self.process_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\middleware\common.py", line 48, in process_request
+    host = request.get_host()
+           ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\PC\AppData\Local\Programs\Python\Python312\Lib\site-packages\django\http\request.py", line 203, in get_host
+    raise DisallowedHost(msg)
+django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: 'testserver'. You may need to add 'testserver' to ALLOWED_HOSTS.
+WARNING 2026-07-11 21:44:11,626 log 28008 22660 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-11 21:44:11,628 basehttp 28008 22660 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 5077
+WARNING 2026-07-11 21:55:05,126 log 28008 27456 Forbidden (CSRF token from POST incorrect.): /admin/login/
+WARNING 2026-07-11 21:55:05,159 basehttp 28008 27456 "POST /admin/login/?next=/admin/ HTTP/1.1" 403 2503
+WARNING 2026-07-11 22:18:34,388 log 28008 22708 Not Found: /.well-known/appspecific/com.chrome.devtools.json
+WARNING 2026-07-11 22:18:34,389 basehttp 28008 22708 "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 5077

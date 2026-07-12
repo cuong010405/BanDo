@@ -6,6 +6,7 @@
 let map;
 let startMarker, endMarker, userMarker, userAccuracyCircle;
 let routePolylineBg, routePolyline;      // bg = white shadow underneath
+let debugGraphLayer = null;              // Layer group for debugging nodes/edges
 let startCoords = null;
 let endCoords   = null;
 let watchId     = null;
@@ -69,11 +70,25 @@ const CAMPUS_BOUNDS = { minLat: 10.415, maxLat: 10.425, minLng: 105.638, maxLng:
 const MOCK_LAT = 10.420601, MOCK_LNG = 105.643611, MOCK_ACC = 4.2;
 const OFF_ROUTE_THRESHOLD_M = 30;       // trigger recalculation
 const RECALC_COOLDOWN_MS    = 15000;    // min 15 sec between recalculations
+const GPS_LOW_ACCURACY_THRESHOLD_M = 15; // Ngưỡng sai số định vị (m) - lớn hơn mức này sẽ báo GPS yếu
 
 // Parse JSON payloads from Django template
 const campusLocations = JSON.parse(document.getElementById('locations-data').textContent);
 const campusNodes     = JSON.parse(document.getElementById('nodes-data').textContent);
 const campusEdges     = JSON.parse(document.getElementById('edges-data').textContent);
+const campusBuildingPolygons = JSON.parse(document.getElementById('building-polygons-data').textContent);
+
+// ====================================================
+// SHARED POLYGON STYLE (buildings + sports areas)
+// ====================================================
+const POLYGON_STYLE = {
+    color: '#2563EB',
+    weight: 2,
+    opacity: 1,
+    fillColor: '#60A5FA',
+    fillOpacity: 0.15,
+    interactive: false
+};
 
 // ====================================================
 // INIT
@@ -94,11 +109,28 @@ document.addEventListener('DOMContentLoaded', function () {
 
     drawPoiMarkers();
 
+    // Draw Building & Sports Area Polygons (shared blue style)
+    if (typeof campusBuildingPolygons !== 'undefined' && campusBuildingPolygons) {
+        campusBuildingPolygons.forEach((poly) => {
+            L.polygon(poly, POLYGON_STYLE).addTo(map);
+        });
+    }
+
     document.getElementById('my-location-btn').addEventListener('click', handleMyLocationClick);
     document.getElementById('calculate-btn').addEventListener('click', calculateSmartRoute);
     document.getElementById('reset-btn').addEventListener('click', resetRoutingState);
     document.getElementById('nav-recenter-btn').addEventListener('click', recenterOnUser);
     document.getElementById('nav-recalculate-btn').addEventListener('click', triggerManualRecalculate);
+
+    const debugSwitch = document.getElementById('debug-graph-switch');
+    if (debugSwitch) {
+        debugSwitch.addEventListener('change', toggleDebugGraph);
+    }
+
+    const editorSwitch = document.getElementById('editor-mode-switch');
+    if (editorSwitch) {
+        editorSwitch.addEventListener('change', toggleEditorMode);
+    }
 
     map.on('click', handleMapClick);
     map.on('drag', () => { navAutoFollow = false; showCenterBtn(true); });
@@ -186,6 +218,7 @@ function setRoutingPoint(type, lat, lng, name) {
         
         // Only draw startMarker if it is NOT the user's live GPS location to avoid duplicate overlap with green arrow userMarker
         if (name !== 'Vị trí của tôi (GPS)') {
+            stopGPSTracking();
             startMarker = L.marker([lat, lng], {
                 draggable: true,
                 icon: L.divIcon({ html: `<i class="fa-solid fa-circle-play text-primary fs-3 shadow animate-pulse"></i>`, className: 'start-marker-icon', iconSize: [24, 24], iconAnchor: [12, 12] })
@@ -216,14 +249,20 @@ function setRoutingPoint(type, lat, lng, name) {
 }
 
 function handleMapClick(e) {
-    if (!startCoords) setRoutingPoint('start', e.latlng.lat, e.latlng.lng);
-    else if (!endCoords) setRoutingPoint('end', e.latlng.lat, e.latlng.lng);
+    if (editorMode && handleEditorMapClick(e)) return;
+    const lat = e.latlng.lat;
+    const lng = e.latlng.lng;
+    L.popup()
+        .setLatLng([lat, lng])
+        .setContent(buildPopupHtml('Tọa độ đã chọn', `${lat.toFixed(5)}, ${lng.toFixed(5)}`, `Vĩ độ: ${lat.toFixed(6)}<br>Kinh độ: ${lng.toFixed(6)}`, lat, lng))
+        .openOn(map);
 }
 
 // ====================================================
 // RESET
 // ====================================================
 function resetRoutingState() {
+    stopGPSTracking();
     stopLiveNavigation();
     navRouteGeometry     = [];
     navRemainingGeometry = [];
@@ -241,6 +280,14 @@ function resetRoutingState() {
     document.getElementById('route-result-panel').classList.add('d-none');
     hideNavHud();
     showCenterBtn(false);
+
+    // Exit editor mode if active
+    if (editorMode) {
+        const switchEl = document.getElementById('editor-mode-switch');
+        if (switchEl) switchEl.checked = false;
+        toggleEditorMode();
+    }
+
     map.setView(campusCenter, 17);
 }
 
@@ -290,6 +337,49 @@ function startGPSTracking() {
 
 function getUserLocation() { startGPSTracking(); }   // alias for legacy calls
 
+function stopGPSTracking() {
+    if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+    }
+    const btn = document.getElementById('my-location-btn');
+    if (btn) {
+        btn.innerHTML = `<i class="fa-solid fa-location-crosshairs" id="gps-btn-icon"></i>`;
+    }
+    if (userAccuracyCircle) {
+        map.removeLayer(userAccuracyCircle);
+        userAccuracyCircle = null;
+    }
+    if (userMarker) {
+        map.removeLayer(userMarker);
+        userMarker = null;
+    }
+    document.getElementById('gps-status-panel').classList.add('d-none');
+    showCenterBtn(false);
+    gpsInitialized = false;
+    gpsInitSamples = [];
+}
+
+/**
+ * Snap a raw GPS coordinate to the nearest campus building/location.
+ * Returns { lat, lng, name } of the closest campusLocation entry.
+ */
+function snapToNearestBuilding(lat, lng) {
+    if (!campusLocations || campusLocations.length === 0) return null;
+    let best = null, bestDist = Infinity;
+    campusLocations.forEach(loc => {
+        if (!loc.latitude || !loc.longitude) return;
+        const d = haversineDistanceM(lat, lng, parseFloat(loc.latitude), parseFloat(loc.longitude));
+        if (d < bestDist) {
+            bestDist = d;
+            best = { lat: parseFloat(loc.latitude), lng: parseFloat(loc.longitude), name: loc.name, dist: d };
+        }
+    });
+    return best;
+}
+
+let _buildingConfirmShown = false; // prevent repeated confirmation popups
+
 function onGPSUpdate(position, btn) {
     let lat = position.coords.latitude;
     let lng = position.coords.longitude;
@@ -298,39 +388,71 @@ function onGPSUpdate(position, btn) {
     const inCampus = lat >= CAMPUS_BOUNDS.minLat && lat <= CAMPUS_BOUNDS.maxLat &&
                      lng >= CAMPUS_BOUNDS.minLng && lng <= CAMPUS_BOUNDS.maxLng;
 
+    // --- GPS Quality Gate ---
+    let usingMock = false;
     if (!inCampus) {
-        lat = MOCK_LAT; lng = MOCK_LNG;
-        showToastNotification('Phát hiện bạn ở ngoài trường. Đã kích hoạt GPS mô phỏng trong DTHU!');
+        // Outside campus → use mock located inside DTHU campus
+        showToastNotification('Bạn ở ngoài campus. Đang dùng GPS mô phỏng tại khuôn viên DTHU!');
+        lat = MOCK_LAT;
+        lng = MOCK_LNG;
+        usingMock = true;
+    } else if (acc > GPS_LOW_ACCURACY_THRESHOLD_M) {
+        // --- Smart Building Snap ---
+        // GPS accuracy too poor to pinpoint exact position → snap to nearest building
+        // and ask the user to confirm, so a stranger can understand where they are.
+        const nearest = snapToNearestBuilding(lat, lng);
+        if (nearest) {
+            lat = nearest.lat;
+            lng = nearest.lng;
+
+            if (!_buildingConfirmShown) {
+                _buildingConfirmShown = true;
+                const popupContent = `
+                    <div style="font-family:sans-serif;min-width:200px">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:6px">📍 Vị trí của bạn</div>
+                        <div style="margin-bottom:8px">GPS phát hiện bạn đang gần:<br><b>${nearest.name}</b></div>
+                        <div style="font-size:12px;color:#666;margin-bottom:10px">Sai số GPS: ~${Math.round(acc)}m</div>
+                        <div style="display:flex;gap:6px">
+                            <button onclick="confirmBuildingLocation(${nearest.lat},${nearest.lng},'${nearest.name.replace(/'/g, "&#39;")}')"
+                                style="flex:1;padding:6px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">✅ Đúng rồi</button>
+                            <button onclick="openBuildingSelector()"
+                                style="flex:1;padding:6px;background:#f3f4f6;color:#111;border:1px solid #d1d5db;border-radius:6px;cursor:pointer;font-size:12px">❌ Sai, chọn lại</button>
+                        </div>
+                    </div>
+                `;
+                L.popup({ closeButton: true, autoClose: false, closeOnClick: false })
+                    .setLatLng([nearest.lat, nearest.lng])
+                    .setContent(popupContent)
+                    .openOn(map);
+                map.setView([nearest.lat, nearest.lng], 18, { animate: true });
+            }
+        } else {
+            showToastNotification(`⚠️ GPS yếu (${Math.round(acc)}m). Vị trí có thể lệch.`);
+        }
     }
 
-    // A. Reject readings with very poor accuracy (>80m = signal too weak)
-    if (acc > 80) return;
-
-    // Warn if accuracy is moderate
-    if (acc > 25) {
-        showToastNotification(`Tín hiệu định vị yếu (${Math.round(acc)}m). Vui lòng ra ngoài trời để cải thiện.`);
-    }
-
-    // B. Multi-sample calibration: collect best 3 samples, then lock in
+    // B. Multi-sample calibration: collect best 5 samples, use the most accurate one
     if (!gpsInitialized) {
-        gpsInitSamples.push({ lat, lng, acc, position });
+        gpsInitSamples.push({ lat, lng, acc });
 
-        // Always show the best-accuracy sample seen so far
+        // Show the best-accuracy sample seen so far
         const sortedSamples = gpsInitSamples.slice().sort((a, b) => a.acc - b.acc);
         const currentBest = sortedSamples[0];
         lat = currentBest.lat;
         lng = currentBest.lng;
 
-        if (gpsInitSamples.length >= 3) {
+        if (gpsInitSamples.length >= 5) {
             gpsInitialized = true;
             gpsInitSamples = [];
-            showToastNotification('✅ Đã định vị! Độ chính xác: ~' + Math.round(acc) + 'm');
+            const displayAcc = usingMock ? '~mô phỏng' : Math.round(currentBest.acc) + 'm';
+            showToastNotification('✅ Đã định vị! Độ chính xác: ' + displayAcc);
         }
     }
 
-    // C. Kalman Filter smoothing logic
-    const kLat = kalmanLat.filter(lat, acc);
-    const kLng = kalmanLng.filter(lng, acc);
+    // C. Kalman Filter smoothing (clamp accuracy to avoid extreme noise weights)
+    const effectiveAcc = Math.min(acc, 50);
+    const kLat = kalmanLat.filter(lat, effectiveAcc);
+    const kLng = kalmanLng.filter(lng, effectiveAcc);
 
     // D. Minimum movement threshold (ignore movements smaller than 2.5 meters unless accuracy improved significantly)
     let shouldUpdate = false;
@@ -396,6 +518,51 @@ function onGPSUpdate(position, btn) {
     if (navIsActive && navRemainingGeometry.length >= 2) {
         updateNavigation(kLat, kLng);
     }
+}
+
+/**
+ * Called when user confirms the auto-snapped building is correct.
+ * Locks in that position as the routing start point.
+ */
+function confirmBuildingLocation(lat, lng, name) {
+    map.closePopup();
+    setRoutingPoint('start', lat, lng, name);
+    showToastNotification(`✅ Đã xác nhận vị trí: ${name}`);
+}
+
+/**
+ * Called when user says the auto-snapped building is wrong.
+ * Opens a searchable list of all campus locations for manual selection.
+ */
+function openBuildingSelector() {
+    map.closePopup();
+    _buildingConfirmShown = false; // allow popup again after manual select
+
+    // Build a scrollable modal-like popup at campus center
+    const items = campusLocations.map((loc, i) =>
+        `<div onclick="selectBuildingManually(${parseFloat(loc.latitude)},${parseFloat(loc.longitude)},'${loc.name.replace(/'/g,'&#39;')}')"
+              style="padding:7px 10px;cursor:pointer;border-bottom:1px solid #eee;font-size:13px"
+              onmouseover="this.style.background='#f0f9ff'" onmouseout="this.style.background=''">${loc.name}</div>`
+    ).join('');
+
+    const html = `
+        <div style="font-family:sans-serif;width:240px;max-height:300px;overflow-y:auto">
+            <div style="font-weight:700;padding:8px 10px;border-bottom:2px solid #2563eb;font-size:14px">🏛️ Chọn tòa nhà của bạn</div>
+            ${items}
+        </div>
+    `;
+    L.popup({ closeButton: true, maxWidth: 260 })
+        .setLatLng(campusCenter)
+        .setContent(html)
+        .openOn(map);
+}
+
+/** Select a building manually from the list popup. */
+function selectBuildingManually(lat, lng, name) {
+    map.closePopup();
+    updateUserMarker(lat, lng, 5, 0);
+    setRoutingPoint('start', lat, lng, name);
+    showToastNotification(`📍 Đã đặt vị trí: ${name}`);
 }
 
 function onGPSFallback(btn) {
@@ -473,6 +640,9 @@ async function calculateSmartRoute() {
     const algorithm = document.getElementById('algorithm-select').value;
     const csrfToken = getCookie('csrftoken');
 
+    // Xóa polyline cũ ngay trước khi gọi API
+    clearRoutePolylines();
+
     try {
         const response = await fetch('/api/routes/calculate', {
             method: 'POST',
@@ -487,20 +657,35 @@ async function calculateSmartRoute() {
         });
 
         const data = await response.json();
-        if (!response.ok) { alert(data.error || 'Lỗi tính toán đường đi.'); return; }
 
-        drawRoutePolyline(data.primary.geometry);
+        if (!response.ok) {
+            // Hiển thị lỗi từ backend (ví dụ: "Không tìm thấy đường đi")
+            showToastNotification('❌ ' + (data.error || 'Lỗi tính toán đường đi.'));
+            return;
+        }
+
+        const geometry = data.primary.geometry;
+        if (!geometry || geometry.length < 2) {
+            showToastNotification('❌ Không tìm thấy đường đi giữa hai điểm này.');
+            return;
+        }
+
+        console.log('[Route] Geometry points:', geometry.length, geometry);
+        drawRoutePolyline(geometry);
 
         document.getElementById('route-result-panel').classList.remove('d-none');
-        document.getElementById('route-distance').innerText = `${data.primary.distance_m} mét (${data.primary.distance_km} km)`;
-        const m = Math.floor(data.primary.duration_s / 60), s = Math.round(data.primary.duration_s % 60);
+        document.getElementById('route-distance').innerText =
+            `${data.primary.distance_m} mét (${data.primary.distance_km} km)`;
+        const m = Math.floor(data.primary.duration_s / 60),
+              s = Math.round(data.primary.duration_s % 60);
         document.getElementById('route-duration').innerText = `${m} phút ${s} giây`;
 
         populateAlgorithmComparison(data);
-        showNavHud(document.getElementById('end-input').value, data.primary.distance_m, data.primary.duration_s);
+        showNavHud(document.getElementById('end-input').value,
+                   data.primary.distance_m, data.primary.duration_s);
     } catch (err) {
         console.error('Route calculation failed', err);
-        alert('Lỗi kết nối tới máy chủ Django.');
+        showToastNotification('❌ Lỗi kết nối tới máy chủ Django.');
     } finally {
         calcBtn.disabled = false;
         calcBtn.innerHTML = `<i class="fa-solid fa-compass me-1"></i>Tìm đường`;
@@ -511,32 +696,51 @@ async function calculateSmartRoute() {
 // ROUTE POLYLINE DRAWING
 // ====================================================
 function clearRoutePolylines() {
-    if (routePolylineBg) { map.removeLayer(routePolylineBg); routePolylineBg = null; }
-    if (routePolyline)   { map.removeLayer(routePolyline);   routePolyline   = null; }
+    // Luôn xóa sạch cả 2 layer trước khi vẽ mới
+    if (routePolylineBg) {
+        try { map.removeLayer(routePolylineBg); } catch(e) {}
+        routePolylineBg = null;
+    }
+    if (routePolyline) {
+        try { map.removeLayer(routePolyline); } catch(e) {}
+        routePolyline = null;
+    }
 }
 
+/**
+ * Vẽ đúng một polyline từ geometry [[lat,lng],...] do backend trả về.
+ * Geometry đã được xử lý: start_user → node path → end_user.
+ * Không vẽ thêm bất kỳ layer nào khác.
+ */
 function drawRoutePolyline(geometry) {
+    // Bước 1: Xóa polyline cũ
     clearRoutePolylines();
 
-    // Geometry is already cleaned by backend (deduped + GPS prepend)
+    if (!geometry || geometry.length < 2) {
+        console.warn('[Route] Geometry rỗng hoặc quá ngắn, bỏ qua vẽ.');
+        return;
+    }
+
+    // Bước 2: Lưu geometry cho live navigation
     navRouteGeometry     = geometry.slice();
     navRemainingGeometry = geometry.slice();
 
-    // White shadow (outline) underneath
+    // Bước 3: Vẽ shadow trắng phía dưới (hiệu ứng viền)
     routePolylineBg = L.polyline(geometry, {
         color: '#ffffff', weight: 9, opacity: 0.35,
-        lineCap: 'round', lineJoin: 'round', smoothFactor: 2
+        lineCap: 'round', lineJoin: 'round', smoothFactor: 1
     }).addTo(map);
 
-    // Main blue route
+    // Bước 4: Vẽ đường màu xanh chính — ĐÂY LÀ POLYLINE DUY NHẤT
     routePolyline = L.polyline(geometry, {
         color: '#3b82f6', weight: 5, opacity: 0.95,
-        lineCap: 'round', lineJoin: 'round', smoothFactor: 2
+        lineCap: 'round', lineJoin: 'round', smoothFactor: 1
     }).addTo(map);
 
+    // Bước 5: Zoom bản đồ vào đường đi
     map.fitBounds(routePolyline.getBounds(), { padding: [50, 50], animate: true });
 
-    // Begin live navigation
+    // Bước 6: Bắt đầu live navigation
     startLiveNavigation();
 }
 
@@ -860,6 +1064,405 @@ async function submitFeedbackForm(e) {
             alert(d.detail || 'Lỗi gửi phản hồi.');
         }
     } catch { alert('Lỗi kết nối tới máy chủ Django khi gửi phản hồi.'); }
+}
+
+// ====================================================
+// EDITOR MODE (Quản lý RouteNode & RouteEdge)
+// ====================================================
+let editorMode = false;
+let editorTool = null;         // 'add_node' | 'delete_node' | 'move_node' | 'add_edge' | 'delete_edge'
+let editorEdgeFirstNode = null; // First node selected for edge creation
+let editorLayers = null;        // L.layerGroup for editor markers/edges
+let editorNodeMarkers = {};     // { nodeId: L.marker }
+let editorEdgeLines = {};       // { edgeId: L.polyline }
+
+/**
+ * Toggle editor mode on/off.
+ */
+function toggleEditorMode() {
+    editorMode = !editorMode;
+    const panel = document.getElementById('editor-panel');
+    const switchEl = document.getElementById('editor-mode-switch');
+
+    if (editorMode) {
+        panel.classList.remove('d-none');
+        editorLayers = L.layerGroup().addTo(map);
+        loadEditorGraph();
+        map.getContainer().style.cursor = 'crosshair';
+        showToastNotification('🔧 Chế độ Editor đã bật. Chọn công cụ để chỉnh sửa đồ thị.');
+    } else {
+        panel.classList.add('d-none');
+        if (editorLayers) { map.removeLayer(editorLayers); editorLayers = null; }
+        editorNodeMarkers = {};
+        editorEdgeLines = {};
+        editorEdgeFirstNode = null;
+        editorTool = null;
+        map.getContainer().style.cursor = '';
+        document.querySelectorAll('.editor-tool-btn').forEach(b => b.classList.remove('active'));
+        // Reload page to sync graph data with routing
+        window.location.reload();
+    }
+}
+
+/**
+ * Set the active editor tool.
+ */
+function setEditorTool(tool) {
+    editorTool = tool;
+    editorEdgeFirstNode = null;
+    document.querySelectorAll('.editor-tool-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('editor-tool-' + tool);
+    if (btn) btn.classList.add('active');
+
+    if (tool === 'add_edge') {
+        showToastNotification('🔗 Chọn 2 RouteNode để tạo cạnh. Nhấn node thứ nhất, rồi node thứ hai.');
+    } else if (tool === 'delete_edge') {
+        showToastNotification('🗑️ Click vào cạnh cần xóa.');
+    } else if (tool === 'add_node') {
+        showToastNotification('➕ Click trên bản đồ để thêm RouteNode mới.');
+    } else if (tool === 'delete_node') {
+        showToastNotification('🗑️ Click vào RouteNode cần xóa.');
+    } else if (tool === 'move_node') {
+        showToastNotification('✋ Kéo RouteNode để di chuyển.');
+    }
+}
+
+/**
+ * Load all nodes and edges into the editor layer.
+ */
+function loadEditorGraph() {
+    if (!editorLayers) return;
+    editorLayers.clearLayers();
+    editorNodeMarkers = {};
+    editorEdgeLines = {};
+
+    // Draw edges
+    campusEdges.forEach(edge => {
+        const nodeA = campusNodes.find(n => n.id === edge.node_a);
+        const nodeB = campusNodes.find(n => n.id === edge.node_b);
+        if (nodeA && nodeB) {
+            const line = L.polyline([[nodeA.lat, nodeA.lng], [nodeB.lat, nodeB.lng]], {
+                color: '#60a5fa', weight: 3, opacity: 0.8
+            });
+            line.edgeId = edge.id;
+            line.edgeData = edge;
+            line.bindTooltip(`Edge #${edge.id}`, { sticky: true });
+            line.on('click', function (e) {
+                L.DomEvent.stop(e);
+                handleEditorEdgeClick(this);
+            });
+            line.addTo(editorLayers);
+            editorEdgeLines[edge.id] = line;
+        }
+    });
+
+    // Draw nodes
+    campusNodes.forEach(node => {
+        const marker = L.circleMarker([node.lat, node.lng], {
+            radius: 7,
+            fillColor: '#f59e0b',
+            color: '#ffffff',
+            weight: 2,
+            fillOpacity: 1.0,
+            zIndexOffset: 2000
+        });
+        marker.nodeId = node.id;
+        marker.nodeData = node;
+        marker.bindTooltip(`Node #${node.id}: ${node.name || 'Chưa đặt tên'}`, {
+            permanent: false, direction: 'top', offset: [0, -8]
+        });
+        marker.on('click', function (e) {
+            L.DomEvent.stop(e);
+            handleEditorNodeClick(this);
+        });
+        // Drag for move_node tool
+        marker.dragging();
+        marker.on('dragstart', function () {
+            if (editorTool !== 'move_node') {
+                marker.dragging._draggable.disable();
+            }
+        });
+        marker.on('dragend', function (e) {
+            if (editorTool === 'move_node') {
+                handleEditorNodeMove(this);
+            }
+        });
+        marker.addTo(editorLayers);
+        editorNodeMarkers[node.id] = marker;
+    });
+}
+
+/**
+ * Handle click on a node in editor mode.
+ */
+function handleEditorNodeClick(marker) {
+    if (!editorTool) return;
+
+    if (editorTool === 'delete_node') {
+        if (!confirm(`Xóa RouteNode #${marker.nodeId}? Cạnh liên quan cũng sẽ bị xóa.`)) return;
+        deleteEditorNode(marker.nodeId);
+    } else if (editorTool === 'add_edge') {
+        if (!editorEdgeFirstNode) {
+            editorEdgeFirstNode = marker;
+            marker.setStyle({ fillColor: '#22c55e', color: '#22c55e' });
+            showToastNotification(`✅ Đã chọn node #${marker.nodeId}. Chọn node thứ hai để tạo cạnh.`);
+        } else {
+            if (editorEdgeFirstNode.nodeId === marker.nodeId) {
+                showToastNotification('⚠️ Không thể tạo cạnh từ node đến chính nó.');
+                return;
+            }
+            createEditorEdge(editorEdgeFirstNode.nodeId, marker.nodeId);
+            editorEdgeFirstNode.setStyle({ fillColor: '#f59e0b', color: '#ffffff' });
+            editorEdgeFirstNode = null;
+        }
+    } else if (editorTool === 'move_node') {
+        // Enable drag
+        marker.dragging._draggable.enable();
+    }
+}
+
+/**
+ * Handle click on an edge in editor mode.
+ */
+function handleEditorEdgeClick(line) {
+    if (editorTool === 'delete_edge') {
+        if (!confirm(`Xóa cạnh #${line.edgeId}?`)) return;
+        deleteEditorEdge(line.edgeId);
+    }
+}
+
+/**
+ * Handle node move (drag end).
+ */
+async function handleEditorNodeMove(marker) {
+    const lat = marker.getLatLng().lat;
+    const lng = marker.getLatLng().lng;
+    try {
+        const res = await fetch(`/api/route-nodes/${marker.nodeId}/`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ latitude: lat.toFixed(6), longitude: lng.toFixed(6) })
+        });
+        if (res.ok) {
+            // Update local data
+            const node = campusNodes.find(n => n.id === marker.nodeId);
+            if (node) { node.lat = lat; node.lng = lng; }
+            showToastNotification(`✅ Đã di chuyển Node #${marker.nodeId} đến (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+            loadEditorGraph();
+        } else {
+            const data = await res.json();
+            showToastNotification('❌ Lỗi: ' + (data.detail || JSON.stringify(data)));
+            loadEditorGraph(); // Reset position
+        }
+    } catch (e) {
+        showToastNotification('❌ Lỗi kết nối server.');
+        loadEditorGraph();
+    }
+}
+
+/**
+ * Add a new RouteNode via API.
+ */
+async function addEditorNode(lat, lng) {
+    const name = prompt('Nhập tên cho RouteNode mới (bỏ trống nếu không cần):', '');
+    try {
+        const res = await fetch('/api/route-nodes/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ latitude: lat.toFixed(6), longitude: lng.toFixed(6), name: name || '' })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            campusNodes.push({ id: data.id, lat: lat, lng: lng, name: name || '', is_on_walkway: true });
+            showToastNotification(`✅ Đã thêm Node #${data.id} (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+            loadEditorGraph();
+        } else {
+            const data = await res.json();
+            const msg = typeof data === 'string' ? data : (data.detail || data.non_field_errors?.[0] || JSON.stringify(data));
+            showToastNotification('❌ Lỗi: ' + msg);
+        }
+    } catch (e) {
+        showToastNotification('❌ Lỗi kết nối server.');
+    }
+}
+
+/**
+ * Delete a RouteNode via API.
+ */
+async function deleteEditorNode(nodeId) {
+    try {
+        const res = await fetch(`/api/route-nodes/${nodeId}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+        if (res.ok) {
+            // Remove from local data
+            const idx = campusNodes.findIndex(n => n.id === nodeId);
+            if (idx !== -1) campusNodes.splice(idx, 1);
+            // Remove related edges from local data
+            for (let i = campusEdges.length - 1; i >= 0; i--) {
+                if (campusEdges[i].node_a === nodeId || campusEdges[i].node_b === nodeId) {
+                    campusEdges.splice(i, 1);
+                }
+            }
+            showToastNotification(`✅ Đã xóa Node #${nodeId}`);
+            loadEditorGraph();
+        } else {
+            showToastNotification('❌ Lỗi xóa node.');
+        }
+    } catch (e) {
+        showToastNotification('❌ Lỗi kết nối server.');
+    }
+}
+
+/**
+ * Create a new RouteEdge between two nodes via API.
+ */
+async function createEditorEdge(nodeAId, nodeBId) {
+    const nodeA = campusNodes.find(n => n.id === nodeAId);
+    const nodeB = campusNodes.find(n => n.id === nodeBId);
+    if (!nodeA || !nodeB) return;
+
+    // Calculate distance via haversine
+    const dist = haversineDistanceM(nodeA.lat, nodeA.lng, nodeB.lat, nodeB.lng);
+
+    try {
+        const res = await fetch('/api/route-edges/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({
+                node_a: nodeAId,
+                node_b: nodeBId,
+                distance: Math.round(dist * 100) / 100,
+                points: [[nodeA.lat, nodeA.lng], [nodeB.lat, nodeB.lng]],
+                is_active: true
+            })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            // Add forward edge to local data
+            campusEdges.push({
+                id: data.id, node_a: nodeAId, node_b: nodeBId,
+                distance: dist, is_valid: true
+            });
+            showToastNotification(`✅ Đã tạo cạnh #${data.id}: Node #${nodeAId} → Node #${nodeBId} (${Math.round(dist)}m)`);
+            loadEditorGraph();
+        } else {
+            const data = await res.json();
+            const msg = typeof data === 'string' ? data : (data.detail || data.non_field_errors?.[0] || JSON.stringify(data));
+            showToastNotification('❌ ' + msg);
+        }
+    } catch (e) {
+        showToastNotification('❌ Lỗi kết nối server.');
+    }
+}
+
+/**
+ * Delete a RouteEdge via API.
+ */
+async function deleteEditorEdge(edgeId) {
+    try {
+        const res = await fetch(`/api/route-edges/${edgeId}/`, {
+            method: 'DELETE',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        });
+        if (res.ok) {
+            // Remove from local data
+            const idx = campusEdges.findIndex(e => e.id === edgeId);
+            if (idx !== -1) campusEdges.splice(idx, 1);
+            showToastNotification(`✅ Đã xóa cạnh #${edgeId}`);
+            loadEditorGraph();
+        } else {
+            showToastNotification('❌ Lỗi xóa cạnh.');
+        }
+    } catch (e) {
+        showToastNotification('❌ Lỗi kết nối server.');
+    }
+}
+
+/**
+ * Handle map click in editor mode.
+ */
+function handleEditorMapClick(e) {
+    if (!editorMode) return false;
+    if (editorTool === 'add_node') {
+        addEditorNode(e.latlng.lat, e.latlng.lng);
+        return true; // consumed
+    }
+    return false; // not consumed
+}
+
+// ====================================================
+// DEBUG GRAPH LAYER
+// ====================================================
+function toggleDebugGraph(e) {
+    const isChecked = e.target.checked;
+    
+    if (debugGraphLayer) {
+        map.removeLayer(debugGraphLayer);
+        debugGraphLayer = null;
+    }
+    
+    if (!isChecked) return;
+    
+    debugGraphLayer = L.layerGroup();
+    
+    // 1. Draw Building Polygons removed as requested to clear red outlines around building markers
+    
+    // 2. Draw edges: gray for valid walkway edges, red for invalid (intersecting building)
+    campusEdges.forEach(edge => {
+        const nodeA = campusNodes.find(n => n.id === edge.node_a);
+        const nodeB = campusNodes.find(n => n.id === edge.node_b);
+        if (nodeA && nodeB) {
+            const linePoints = [[nodeA.lat, nodeA.lng], [nodeB.lat, nodeB.lng]];
+            
+            const edgeLine = L.polyline(linePoints, {
+                color: edge.is_valid ? '#9ca3af' : '#ef4444', // gray-400 vs red-500
+                weight: 3,
+                opacity: 0.8,
+                dashArray: edge.is_valid ? null : '4, 4'
+            });
+            const textA = nodeA.name ? `${nodeA.name} (${nodeA.id})` : `Node ${nodeA.id}`;
+            const textB = nodeB.name ? `${nodeB.name} (${nodeB.id})` : `Node ${nodeB.id}`;
+            
+            edgeLine.bindTooltip(`Edge ID: ${edge.id} | ${textA} ⇄ ${textB} (${edge.is_valid ? 'Hợp lệ' : 'Lỗi cắt nhà'})`, { sticky: true });
+            edgeLine.addTo(debugGraphLayer);
+        }
+    });
+    
+    // 3. Draw nodes: red circle markers with tooltips & popups showing ID
+    campusNodes.forEach(node => {
+        const marker = L.circleMarker([node.lat, node.lng], {
+            radius: 6,
+            fillColor: '#ef4444', // red-500
+            color: '#ffffff',
+            weight: 1.5,
+            fillOpacity: 1.0,
+            zIndexOffset: 1000
+        });
+        
+        const label = `Node ID: ${node.id} | ${node.name ? `<b>${node.name}</b>` : 'Nút không tên'}`;
+        marker.bindTooltip(label, { 
+            permanent: false, 
+            direction: 'top',
+            offset: [0, -6]
+        });
+        
+        marker.bindPopup(`
+            <div style="font-family:sans-serif; font-size:12px; min-width:140px; color:#ffffff;">
+                <h6 style="margin:0 0 -5px 0; color:#ef4444; font-weight:bold; font-size:13px;">📍 Nút Đồ Thị (Node)</h6>
+                <hr style="margin: 5px 0; border-color: #4b5563;">
+                <b>ID:</b> ${node.id}<br>
+                <b>Tên:</b> ${node.name || '<i>Chưa đặt tên</i>'}<br>
+                <b>Vĩ độ:</b> ${node.lat.toFixed(6)}<br>
+                <b>Kinh độ:</b> ${node.lng.toFixed(6)}
+            </div>
+        `);
+        
+        marker.addTo(debugGraphLayer);
+    });
+    
+    debugGraphLayer.addTo(map);
 }
 
 // ====================================================

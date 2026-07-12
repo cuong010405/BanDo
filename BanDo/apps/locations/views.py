@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, filters
 from locations.models import Category, Location, RouteNode, RouteEdge
 from locations.serializers import CategorySerializer, LocationSerializer, RouteNodeSerializer, RouteEdgeSerializer
+from routes.pathfinder import haversine_distance
 
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
@@ -35,6 +36,39 @@ class RouteNodeViewSet(viewsets.ModelViewSet):
     serializer_class = RouteNodeSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = None
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        old_lat = float(instance.latitude)
+        old_lng = float(instance.longitude)
+
+        response = super().partial_update(request, *args, **kwargs)
+
+        if response.status_code == 200:
+            new_lat = float(instance.latitude)
+            new_lng = float(instance.longitude)
+
+            if old_lat != new_lat or old_lng != new_lng:
+                related_edges = RouteEdge.objects.filter(
+                    models.Q(node_a=instance) | models.Q(node_b=instance)
+                )
+                for edge in related_edges:
+                    pts = edge.points or []
+                    if len(pts) >= 2:
+                        new_pts = []
+                        for p in pts:
+                            if abs(p[0] - old_lat) < 1e-6 and abs(p[1] - old_lng) < 1e-6:
+                                new_pts.append([new_lat, new_lng])
+                            else:
+                                new_pts.append(p)
+                        edge.points = new_pts
+                        edge.distance = haversine_distance(
+                            float(edge.node_a.latitude), float(edge.node_a.longitude),
+                            float(edge.node_b.latitude), float(edge.node_b.longitude)
+                        )
+                        edge.save(update_fields=['points', 'distance'])
+
+        return response
 
 from django.db import models
 from rest_framework import status

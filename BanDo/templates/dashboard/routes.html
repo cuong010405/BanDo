@@ -99,22 +99,20 @@
             <div class="w-50 h-100 p-4 d-flex flex-column overflow-hidden">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <h5 class="fw-bold m-0"><i class="fa-solid fa-circle-nodes text-primary me-2"></i>Biên tập đồ thị Campus</h5>
-                    <span class="badge bg-secondary p-2" id="graph-stats-badge">{{ node_count }} Nút | {{ edge_count }} Cạnh</span>
                 </div>
 
                 <!-- Editor Toolbar -->
-                <div class="btn-group btn-group-sm mb-3 w-100 border border-secondary rounded-3 overflow-hidden bg-dark">
-                    <input type="radio" class="btn-check" name="editor-mode" id="mode-view" value="view" checked>
-                    <label class="btn btn-outline-primary border-0 py-2" for="mode-view"><i class="fa-solid fa-eye me-1"></i>Xem đồ thị</label>
-                    
-                    <input type="radio" class="btn-check" name="editor-mode" id="mode-add-node" value="add-node">
-                    <label class="btn btn-outline-success border-0 py-2" for="mode-add-node"><i class="fa-solid fa-circle-plus me-1"></i>+ Thêm Nút</label>
-                    
-                    <input type="radio" class="btn-check" name="editor-mode" id="mode-add-edge" value="add-edge">
-                    <label class="btn btn-outline-warning border-0 py-2" for="mode-add-edge"><i class="fa-solid fa-route me-1"></i>+ Thêm Cạnh</label>
-                    
-                    <input type="radio" class="btn-check" name="editor-mode" id="mode-delete" value="delete">
-                    <label class="btn btn-outline-danger border-0 py-2" for="mode-delete"><i class="fa-solid fa-trash-can me-1"></i>Xoá phần tử</label>
+                <div class="d-flex gap-2 mb-2">
+                    <div class="btn-group btn-group-sm flex-grow-1 border border-secondary rounded-3 overflow-hidden bg-dark">
+                        <input type="radio" class="btn-check" name="editor-mode" id="mode-view" value="view" checked>
+                        <label class="btn btn-outline-primary border-0 py-2" for="mode-view"><i class="fa-solid fa-eye me-1"></i>Xem</label>
+                        <input type="radio" class="btn-check" name="editor-mode" id="mode-add-node" value="add-node">
+                        <label class="btn btn-outline-success border-0 py-2" for="mode-add-node"><i class="fa-solid fa-circle-plus me-1"></i>+ Nút</label>
+                        <input type="radio" class="btn-check" name="editor-mode" id="mode-add-edge" value="add-edge">
+                        <label class="btn btn-outline-warning border-0 py-2" for="mode-add-edge"><i class="fa-solid fa-route me-1"></i>+ Cạnh</label>
+                        <input type="radio" class="btn-check" name="editor-mode" id="mode-delete" value="delete">
+                        <label class="btn btn-outline-danger border-0 py-2" for="mode-delete"><i class="fa-solid fa-trash-can me-1"></i>Xoá</label>
+                    </div>
                 </div>
 
                 <div class="alert alert-info py-2 px-3 small border-0 bg-glass-dark text-info mb-3" id="editor-hint">
@@ -123,6 +121,7 @@
                 
                 <div class="flex-grow-1 border border-secondary rounded overflow-hidden position-relative">
                     <div id="graph-map" class="w-100 h-100"></div>
+                    <div class="graph-stats-overlay" id="graph-stats-badge">{{ node_count }} Nodes | {{ edge_count }} Edges</div>
                 </div>
             </div>
         </main>
@@ -157,333 +156,447 @@
     {% endfor %}
 ]
 </script>
+
+<script id="building-polygons-json" type="application/json">
+{{ building_polygons|safe }}
+</script>
 {% endlocalize %}
+
 {% endblock %}
 
 {% block extra_js %}
+<style>
+    .node-id-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: #1a1a1a;
+        background: rgba(255,255,255,0.85);
+        padding: 1px 4px;
+        border-radius: 3px;
+        white-space: nowrap;
+        pointer-events: none;
+        line-height: 1.2;
+        text-align: center;
+        border: 1px solid rgba(0,0,0,0.1);
+        transform: translate(-50%, -100%);
+        margin-top: -8px;
+    }
+    .node-id-label.selected {
+        color: #1e40af;
+        background: rgba(219,234,254,0.95);
+        font-weight: 700;
+        border-color: #3b82f6;
+        font-size: 11px;
+    }
+    .graph-stats-overlay {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+        background: rgba(15,23,42,0.88);
+        color: #e2e8f0;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(255,255,255,0.1);
+        pointer-events: none;
+    }
+    .edge-info-popup {
+        font-size: 12px;
+        color: #1e293b;
+        font-weight: 600;
+        padding: 2px 0;
+    }
+    .toast-editor {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        background: #0f172a;
+        color: #f1f5f9;
+        padding: 10px 24px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
+    .toast-editor.show { opacity: 1; }
+</style>
+
 <script>
     let map, activeRouteLine;
     let nodeLayerGroup, edgeLayerGroup;
-    let currentMode = 'view'; // 'view', 'add-node', 'add-edge', 'delete'
+    let currentMode = 'view';
     let firstSelectedNode = null;
 
     const campusCenter = [10.4206, 105.6436];
-    
-    // Parse raw nodes/edges data
+    const NODE_DOT_SIZE = 10;
+    const NODE_DOT_SELECTED_SIZE = 14;
+
     let nodes = JSON.parse(document.getElementById('nodes-json').textContent);
     let edges = JSON.parse(document.getElementById('edges-json').textContent);
+    let buildingPolygons = JSON.parse(document.getElementById('building-polygons-json').textContent || '[]');
 
-    document.addEventListener("DOMContentLoaded", function () {
-        // Initialize Map
-        map = L.map('graph-map', {
-            fullscreenControl: true
-        }).setView(campusCenter, 17);
+    // ==========================================
+    // TOAST
+    // ==========================================
+    function showToast(msg) {
+        let t = document.getElementById('editor-toast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'editor-toast';
+            t.className = 'toast-editor';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap contributors'
-        }).addTo(map);
-
-        // Layer Groups
-        nodeLayerGroup = L.layerGroup().addTo(map);
-        edgeLayerGroup = L.layerGroup().addTo(map);
-
-        // 1. Draw elements
-        drawGraph(nodes, edges);
-
-        // 2. Map click listener (For adding nodes)
-        map.on('click', handleMapClick);
-
-        // 3. Listen to toolbar mode selections
-        document.querySelectorAll('input[name="editor-mode"]').forEach(radio => {
-            radio.addEventListener('change', function () {
-                currentMode = this.value;
-                resetSelection();
-                
-                const hint = document.getElementById('editor-hint');
-                if (currentMode === 'view') {
-                    hint.className = "alert alert-info py-2 px-3 small border-0 bg-glass-dark text-info mb-3";
-                    hint.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i> Chế độ xem. Click chọn danh sách lưu bên trái để xem đường đi.`;
-                } else if (currentMode === 'add-node') {
-                    hint.className = "alert alert-success py-2 px-3 small border-0 bg-success bg-opacity-25 text-success mb-3";
-                    hint.innerHTML = `<i class="fa-solid fa-square-plus me-1"></i> Chế độ thêm nút. Click bất cứ điểm nào trên bản đồ để thêm nút.`;
-                } else if (currentMode === 'add-edge') {
-                    hint.className = "alert alert-warning py-2 px-3 small border-0 bg-warning bg-opacity-25 text-warning mb-3";
-                    hint.innerHTML = `<i class="fa-solid fa-route me-1"></i> Chế độ thêm cạnh. Click chọn nút gốc (Node 1) rồi click nút đích (Node 2).`;
-                } else if (currentMode === 'delete') {
-                    hint.className = "alert alert-danger py-2 px-3 small border-0 bg-danger bg-opacity-25 text-danger mb-3";
-                    hint.innerHTML = `<i class="fa-solid fa-trash-can me-1"></i> Chế độ xoá. Click trực tiếp lên Nút hoặc Đường nối để xoá khỏi hệ thống.`;
+    // ==========================================
+    // GEOMETRIC HELPERS
+    // ==========================================
+    function pointInPolygon(lat, lng, poly) {
+        let n = poly.length, inside = false;
+        let p1x = poly[0][0], p1y = poly[0][1];
+        for (let i = 0; i <= n; i++) {
+            let p2x = poly[i % n][0], p2y = poly[i % n][1];
+            if (lng > Math.min(p1y, p2y) && lng <= Math.max(p1y, p2y) && lat <= Math.max(p1x, p2x)) {
+                if (p1y !== p2y) {
+                    let xinters = (lng - p1y) * (p2x - p1x) / (p2y - p1y) + p1x;
+                    if (p1x === p2x || lat <= xinters) inside = !inside;
                 }
-            });
-        });
-    });
+            }
+            p1x = p2x; p1y = p2y;
+        }
+        return inside;
+    }
 
-    // Render nodes & polylines
+    function lineIntersection(p1, p2, p3, p4) {
+        let x1=p1[0],y1=p1[1],x2=p2[0],y2=p2[1],x3=p3[0],y3=p3[1],x4=p4[0],y4=p4[1];
+        let denom = (y4-y3)*(x2-x1)-(x4-x3)*(y2-y1);
+        if (denom === 0) return false;
+        let ua = ((x4-x3)*(y1-y3)-(y4-y3)*(x1-x3))/denom;
+        let ub = ((x2-x1)*(y1-y3)-(y2-y1)*(x1-x3))/denom;
+        return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1;
+    }
+
+    function isEdgeValid(latA, lngA, latB, lngB) {
+        for (let poly of buildingPolygons) {
+            if (pointInPolygon(latA, lngA, poly) || pointInPolygon(latB, lngB, poly)) return false;
+            let n = poly.length;
+            for (let i = 0; i < n; i++) {
+                if (lineIntersection([latA,lngA],[latB,lngB], poly[i], poly[(i+1)%n])) return false;
+            }
+        }
+        return true;
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const toRad = x => x * Math.PI / 180;
+        const R = 6371000;
+        const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function getCookie(name) {
+        if (!document.cookie) return null;
+        for (const c of document.cookie.split(';')) {
+            const cv = c.trim();
+            if (cv.startsWith(name + '=')) return decodeURIComponent(cv.slice(name.length + 1));
+        }
+        return null;
+    }
+
+    // ==========================================
+    // NODE DOT ICON
+    // ==========================================
+    function makeNodeIcon(isSelected, size) {
+        const s = size || (isSelected ? NODE_DOT_SELECTED_SIZE : NODE_DOT_SIZE);
+        const color = isSelected ? '#2563eb' : '#ef4444';
+        const border = isSelected ? '#ffffff' : '#991b1b';
+        const shadow = isSelected ? '0 0 8px rgba(37,99,235,0.6)' : '0 0 3px rgba(0,0,0,0.5)';
+        return L.divIcon({
+            html: `<div style="width:${s}px;height:${s}px;background:${color};border:2px solid ${border};border-radius:50%;box-shadow:${shadow};"></div>`,
+            className: '',
+            iconSize: [s, s],
+            iconAnchor: [s/2, s/2]
+        });
+    }
+
+
+
+    // ==========================================
+    // DRAW GRAPH
+    // ==========================================
     function drawGraph(nodeList, edgeList) {
         nodeLayerGroup.clearLayers();
         edgeLayerGroup.clearLayers();
 
-        const nodeMarkers = {};
+        const nodePosMap = {};
 
         // Draw Nodes
         nodeList.forEach(node => {
             const isSelected = firstSelectedNode && firstSelectedNode.id === node.id;
-            
-            const marker = L.circleMarker([node.lat, node.lng], {
-                radius: 6,
-                color: isSelected ? '#eab308' : '#ef4444',
-                fillColor: isSelected ? '#eab308' : '#ef4444',
-                fillOpacity: 1,
-                weight: isSelected ? 4 : 1
+            const marker = L.marker([node.lat, node.lng], {
+                icon: makeNodeIcon(isSelected),
+                draggable: true,
+                zIndexOffset: isSelected ? 2000 : 1000
             }).addTo(nodeLayerGroup);
 
-            const label = node.name ? `${node.name} (Nút ${node.id})` : `Nút ${node.id}`;
-            marker.bindTooltip(label, { permanent: false, direction: 'top' });
+            // Drag: check placement on drop
+            let originalLatLng = null;
+            marker.on('dragstart', e => {
+                originalLatLng = e.target.getLatLng();
+            });
+            marker.on('dragend', async e => {
+                const ll = e.target.getLatLng();
+                const lat = ll.lat, lng = ll.lng;
+                let inBuilding = false;
+                for (let poly of buildingPolygons) {
+                    if (pointInPolygon(lat, lng, poly)) { inBuilding = true; break; }
+                }
+                if (inBuilding) {
+                    showToast('Nút không thể kéo vào trong tòa nhà!');
+                    e.target.setLatLng(originalLatLng);
+                    return;
+                }
+                let invalidEdge = false;
+                for (let edge of edges) {
+                    if (edge.node_a === node.id || edge.node_b === node.id) {
+                        let otherId = edge.node_a === node.id ? edge.node_b : edge.node_a;
+                        let other = nodes.find(n => n.id === otherId);
+                        if (other && !isEdgeValid(lat, lng, other.lat, other.lng)) { invalidEdge = true; break; }
+                    }
+                }
+                if (invalidEdge) {
+                    showToast('Đường nối sẽ đi xuyên tòa nhà!');
+                    e.target.setLatLng(originalLatLng);
+                    return;
+                }
+                try {
+                    const res = await fetch(`/api/route-nodes/${node.id}/`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                        body: JSON.stringify({ latitude: lat.toFixed(6), longitude: lng.toFixed(6) })
+                    });
+                    if (res.ok) await fetchAndRedrawGraph();
+                    else { showToast('Lỗi lưu vị trí nút'); e.target.setLatLng(originalLatLng); }
+                } catch(err) { console.error(err); e.target.setLatLng(originalLatLng); }
+            });
 
-            // Click listener for node
-            marker.on('click', (e) => {
+            // Click: handle node action
+            marker.on('click', e => {
                 L.DomEvent.stopPropagation(e);
                 handleNodeClick(node, marker);
             });
 
-            nodeMarkers[node.id] = [node.lat, node.lng];
+            nodePosMap[node.id] = [node.lat, node.lng];
         });
 
         // Draw Edges
         edgeList.forEach(edge => {
             let pts = edge.points;
             if (!pts || pts.length < 2) {
-                const ptA = nodeMarkers[edge.node_a];
-                const ptB = nodeMarkers[edge.node_b];
-                if (ptA && ptB) pts = [ptA, ptB];
+                const a = nodePosMap[edge.node_a], b = nodePosMap[edge.node_b];
+                if (a && b) pts = [a, b];
             }
-
             if (pts && pts.length >= 2) {
-                const polyline = L.polyline(pts, {
-                    color: '#6b7280',
-                    weight: 4,
-                    opacity: 0.8,
-                    smoothFactor: 1
-                }).addTo(edgeLayerGroup);
-
-                polyline.bindTooltip(`Cạnh ${edge.id}: ${edge.distance.toFixed(1)}m`, { sticky: true });
-
-                // Click listener for edge
-                polyline.on('click', (e) => {
-                    L.DomEvent.stopPropagation(e);
-                    handleEdgeClick(edge);
-                });
+                const pl = L.polyline(pts, { color: '#6b7280', weight: 4, opacity: 0.8 }).addTo(edgeLayerGroup);
+                pl.on('click', e => { L.DomEvent.stopPropagation(e); handleEdgeClick(edge); });
             }
         });
+
+        updateStats();
     }
 
-    // Handle clicks on empty map
+    // ==========================================
+    // STATS
+    // ==========================================
+    function updateStats() {
+        const el = document.getElementById('graph-stats-badge');
+        if (el) el.textContent = `${nodes.length} Nodes | ${edges.length} Edges`;
+    }
+
+    // ==========================================
+    // CLICK HANDLERS
+    // ==========================================
     async function handleMapClick(e) {
         if (currentMode !== 'add-node') return;
-
-        const name = prompt("Nhập tên nhãn cho Nút mới (để trống nếu là nút phụ):");
-        if (name === null) return; // user cancelled
-
-        const lat = e.latlng.lat;
-        const lng = e.latlng.lng;
-        const csrfToken = getCookie('csrftoken');
-
+        const lat = e.latlng.lat, lng = e.latlng.lng;
+        for (let poly of buildingPolygons) {
+            if (pointInPolygon(lat, lng, poly)) { showToast('Nút không thể nằm trong tòa nhà!'); return; }
+        }
+        const name = prompt('Nhập tên nút (bỏ trống nếu không cần):');
+        if (name === null) return;
         try {
-            const response = await fetch('/api/route-nodes/', {
+            const res = await fetch('/api/route-nodes/', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': csrfToken
-                },
-                body: JSON.stringify({
-                    latitude: lat.toFixed(6),
-                    longitude: lng.toFixed(6),
-                    name: name.trim() || null
-                })
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify({ latitude: lat.toFixed(6), longitude: lng.toFixed(6), name: name.trim() || null })
             });
-
-            if (response.ok) {
+            if (res.ok) {
+                const data = await res.json();
+                showToast(`Đã tạo Node #${data.id}`);
                 await fetchAndRedrawGraph();
             } else {
-                alert('Có lỗi xảy ra khi tạo nút mới.');
+                const err = await res.json();
+                showToast('Lỗi: ' + (err.detail || JSON.stringify(err)));
             }
-        } catch (err) {
-            console.error('Failed to create node', err);
-        }
+        } catch(err) { console.error(err); }
     }
 
-    // Handle clicks on Nodes
     async function handleNodeClick(node, marker) {
-        const csrfToken = getCookie('csrftoken');
-
         if (currentMode === 'delete') {
-            if (confirm(`Bạn có chắc chắn muốn xoá Nút ${node.id} (${node.name || 'Không tên'})? Tất cả các đường nối liên kết với nút này sẽ tự động bị xoá.`)) {
+            if (confirm(`Xoá Nút ${node.id}? Tất cả đường nối liên kết sẽ bị xoá.`)) {
                 try {
-                    const response = await fetch(`/api/route-nodes/${node.id}/`, {
+                    const res = await fetch(`/api/route-nodes/${node.id}/`, {
                         method: 'DELETE',
-                        headers: { 'X-CSRFToken': csrfToken }
+                        headers: { 'X-CSRFToken': getCookie('csrftoken') }
                     });
-                    if (response.ok) {
-                        await fetchAndRedrawGraph();
-                    } else {
-                        alert('Không thể xoá nút.');
-                    }
-                } catch (err) {
-                    console.error('Failed to delete node', err);
-                }
+                    if (res.ok) { showToast(`Đã xoá Node #${node.id}`); await fetchAndRedrawGraph(); }
+                    else showToast('Lỗi xoá nút');
+                } catch(err) { console.error(err); }
             }
-        } 
-        
-        else if (currentMode === 'add-edge') {
+        } else if (currentMode === 'add-edge') {
             if (!firstSelectedNode) {
-                // Select first node
                 firstSelectedNode = node;
-                // Highlight yellow immediately
-                marker.setStyle({
-                    color: '#eab308',
-                    fillColor: '#eab308',
-                    weight: 4
-                });
-                document.getElementById('editor-hint').innerHTML = `<i class="fa-solid fa-route me-1"></i> [Node 1: Nút ${node.id}] Đã chọn nút gốc. Click nút thứ 2 để tạo đường nối.`;
+                marker.setIcon(makeNodeIcon(true, NODE_DOT_SELECTED_SIZE));
+                marker.setZIndexOffset(2000);
+                document.getElementById('editor-hint').innerHTML =
+                    `<i class="fa-solid fa-route me-1"></i> <b>${node.id}</b> → ?  Chọn nút đích để tạo cạnh.`;
             } else {
-                if (firstSelectedNode.id === node.id) {
+                if (firstSelectedNode.id === node.id) { resetSelection(); return; }
+                const nA = firstSelectedNode, nB = node;
+                if (!isEdgeValid(nA.lat, nA.lng, nB.lat, nB.lng)) {
+                    showToast('Cạnh đi xuyên tòa nhà!');
                     resetSelection();
                     return;
                 }
-                
-                // We have Node 1 and Node 2. Send creation request
-                const nodeA = firstSelectedNode;
-                const nodeB = node;
-                const dist = haversineDistance(nodeA.lat, nodeA.lng, nodeB.lat, nodeB.lng);
-                
+                const dist = haversineDistance(nA.lat, nA.lng, nB.lat, nB.lng);
                 try {
-                    const response = await fetch('/api/route-edges/', {
+                    const res = await fetch('/api/route-edges/', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': csrfToken
-                        },
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
                         body: JSON.stringify({
-                            node_a: nodeA.id,
-                            node_b: nodeB.id,
-                            distance: dist,
-                            points: [[nodeA.lat, nodeA.lng], [nodeB.lat, nodeB.lng]]
+                            node_a: nA.id, node_b: nB.id,
+                            distance: Math.round(dist * 100) / 100,
+                            points: [[nA.lat, nA.lng], [nB.lat, nB.lng]]
                         })
                     });
-
-                    if (response.ok) {
+                    if (res.ok) {
+                        showToast(`Đã tạo cạnh: ${nA.id} → ${nB.id}`);
                         resetSelection();
                         await fetchAndRedrawGraph();
                     } else {
-                        alert('Không thể tạo cạnh nối.');
+                        const err = await res.json();
+                        showToast('Lỗi: ' + (err.detail || JSON.stringify(err)));
+                        resetSelection();
                     }
-                } catch (err) {
-                    console.error('Failed to create edge', err);
-                }
+                } catch(err) { console.error(err); resetSelection(); }
             }
         }
     }
 
-    // Handle clicks on Edges (polylines)
     async function handleEdgeClick(edge) {
         if (currentMode !== 'delete') return;
-
-        const csrfToken = getCookie('csrftoken');
-        if (confirm(`Bạn có chắc muốn xoá đường nối ${edge.id} (Nút ${edge.node_a} ➔ Nút ${edge.node_b})? Cạnh ngược chiều tương ứng sẽ tự động bị xoá.`)) {
+        if (confirm(`Xoá cạnh #${edge.id} (${edge.node_a} → ${edge.node_b})?`)) {
             try {
-                const response = await fetch(`/api/route-edges/${edge.id}/`, {
+                const res = await fetch(`/api/route-edges/${edge.id}/`, {
                     method: 'DELETE',
-                    headers: { 'X-CSRFToken': csrfToken }
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') }
                 });
-                if (response.ok) {
-                    await fetchAndRedrawGraph();
-                } else {
-                    alert('Lỗi khi xoá cạnh.');
-                }
-            } catch (err) {
-                console.error('Failed to delete edge', err);
-            }
+                if (res.ok) { showToast(`Đã xoá cạnh #${edge.id}`); await fetchAndRedrawGraph(); }
+                else showToast('Lỗi xoá cạnh');
+            } catch(err) { console.error(err); }
         }
     }
 
-    // Fetch new list and redraw layers
+    // ==========================================
+    // FETCH & REDRAW
+    // ==========================================
     async function fetchAndRedrawGraph() {
         try {
-            const [nodesRes, edgesRes] = await Promise.all([
-                fetch('/api/route-nodes/'),
-                fetch('/api/route-edges/')
-            ]);
-            const rawNodes = await nodesRes.json();
-            nodes = rawNodes.map(n => ({
-                id: n.id,
-                lat: parseFloat(n.latitude),
-                lng: parseFloat(n.longitude),
-                name: n.name
-            }));
-            edges = await edgesRes.json();
-            
-            // Draw
+            const [nRes, eRes] = await Promise.all([fetch('/api/route-nodes/'), fetch('/api/route-edges/')]);
+            const rawN = await nRes.json();
+            nodes = rawN.map(n => ({ id: n.id, lat: parseFloat(n.latitude), lng: parseFloat(n.longitude), name: n.name }));
+            edges = await eRes.json();
             drawGraph(nodes, edges);
-
-            // Update stats
-            document.getElementById('graph-stats-badge').innerText = `${nodes.length} Nút | ${edges.length} Cạnh`;
-        } catch (e) {
-            console.error('Fetch graph update failed', e);
-        }
+        } catch(e) { console.error(e); }
     }
 
     function resetSelection() {
         firstSelectedNode = null;
-        drawGraph(nodes, edges); // remove highlights
+        selectedNodeId = null;
+        drawGraph(nodes, edges);
         if (currentMode === 'add-edge') {
-            document.getElementById('editor-hint').innerHTML = `<i class="fa-solid fa-route me-1"></i> Chế độ thêm cạnh. Click chọn nút gốc (Node 1) rồi click nút đích (Node 2).`;
+            document.getElementById('editor-hint').innerHTML =
+                `<i class="fa-solid fa-route me-1"></i> Chế độ thêm cạnh. Click nút gốc, rồi nút đích.`;
         }
     }
 
-    // Draw the clicked route path
     function drawSavedRoute(geometry) {
         if (!geometry || geometry.length < 2) return;
-        
-        if (activeRouteLine) {
-            map.removeLayer(activeRouteLine);
-        }
-
-        activeRouteLine = L.polyline(geometry, {
-            color: '#10b981',
-            weight: 6,
-            opacity: 0.9
-        }).addTo(map);
-
+        if (activeRouteLine) map.removeLayer(activeRouteLine);
+        activeRouteLine = L.polyline(geometry, { color: '#10b981', weight: 6, opacity: 0.9 }).addTo(map);
         map.fitBounds(activeRouteLine.getBounds());
     }
 
-    // Haversine Distance in JS for edge creation weight saving
-    function haversineDistance(lat1, lon1, lat2, lon2) {
-        const toRad = x => (x * Math.PI) / 180;
-        const R = 6371000; // Earth radius in meters
-        const dLat = toRad(lat2 - lat1);
-        const dLon = toRad(lon2 - lon1);
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
+    // ==========================================
+    // INIT
+    // ==========================================
+    document.addEventListener("DOMContentLoaded", function () {
+        map = L.map('graph-map', { fullscreenControl: true }).setView(campusCenter, 17);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
-    // CSRF cookie helper
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
+        nodeLayerGroup = L.layerGroup().addTo(map);
+        edgeLayerGroup = L.layerGroup().addTo(map);
+
+        // Shared style: tòa nhà + sân thể thao → xanh dương
+        const POLYGON_STYLE = {
+            color: '#2563EB',
+            weight: 2,
+            opacity: 1,
+            fillColor: '#60A5FA',
+            fillOpacity: 0.15,
+            interactive: false
+        };
+
+        // Draw all obstacle polygons (buildings + sports areas)
+        buildingPolygons.forEach(poly => {
+            L.polygon(poly, POLYGON_STYLE).addTo(map);
+        });
+
+        drawGraph(nodes, edges);
+        map.on('click', handleMapClick);
+
+        // Mode switch
+        document.querySelectorAll('input[name="editor-mode"]').forEach(radio => {
+            radio.addEventListener('change', function () {
+                currentMode = this.value;
+                resetSelection();
+                const hint = document.getElementById('editor-hint');
+                const modes = {
+                    'view':     ['alert-info', 'text-info', 'Chế độ xem. Kéo nút để di chuyển. Click danh sách bên trái để xem đường đi.'],
+                    'add-node': ['alert-success', 'text-success', 'Chế độ thêm nút. Click trên bản đồ để thêm.'],
+                    'add-edge': ['alert-warning', 'text-warning', 'Chế độ thêm cạnh. Click nút gốc → nút đích.'],
+                    'delete':   ['alert-danger', 'text-danger', 'Chế độ xoá. Click lên nút hoặc cạnh để xoá.']
+                };
+                const m = modes[currentMode] || modes['view'];
+                hint.className = `alert py-2 px-3 small border-0 bg-glass-dark ${m[1]} mb-3`;
+                hint.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i> ${m[2]}`;
+            });
+        });
+    });
 </script>
 {% endblock %}

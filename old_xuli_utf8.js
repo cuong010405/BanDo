@@ -133,13 +133,13 @@ document.addEventListener("DOMContentLoaded", function () {
       map.getPane("stadiumPane").style.zIndex = 530;
       map.createPane("labelPane");
       map.getPane("labelPane").style.zIndex = 700; // nhãn luôn trên cùng
-    } catch (e) {}
+    } catch (e) { }
 
     // Mở rộng giới hạn bản đồ để cho phép xem rộng hơn khuôn viên trường
     const bounds = [
       [10.424125, 105.638641], // Góc dưới trái (rộng hơn)
       [10.417701, 105.647316], // Góc trên phải (rộng hơn)
-      
+
     ];
     map.setMaxBounds(bounds);
 
@@ -382,7 +382,7 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         if (customVisualLayer && map && map.hasLayer(customVisualLayer))
           map.removeLayer(customVisualLayer);
-      } catch {}
+      } catch { }
       customVisualLayer = null;
     }
 
@@ -407,7 +407,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Vẽ ngay (hàm drawCampusOnlyPaths có thể gọi lại)
     try {
       drawCustomVisualPaths();
-    } catch (e) {}
+    } catch (e) { }
     // --- KẾT THÚC đường minh họa ---
 
     // --- VẼ SÂN VẬN ĐỘNG (polygon mô phỏng) ---
@@ -516,7 +516,7 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         if (stadiumLayer && map && map.hasLayer(stadiumLayer))
           map.removeLayer(stadiumLayer);
-      } catch {}
+      } catch { }
       stadiumLayer = null;
     }
 
@@ -531,7 +531,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Vẽ tự động khi load map
     try {
       drawStadium();
-    } catch (e) {}
+    } catch (e) { }
     // --- KẾT THÚC: sân vận động ---
 
     // --- VẼ HỒ BƠI (polygon mô phỏng) ---
@@ -617,7 +617,7 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         if (poolLayer && map && map.hasLayer(poolLayer))
           map.removeLayer(poolLayer);
-      } catch {}
+      } catch { }
       poolLayer = null;
     }
 
@@ -632,7 +632,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Vẽ tự động khi load map
     try {
       drawPool();
-    } catch (e) {}
+    } catch (e) { }
     // --- KẾT THÚC: hồ bơi ---
 
     // --- ĐƯỜNG TRẮNG RIÊNG (dùng cho vẽ chỗ xen kẽ) ---
@@ -695,7 +695,7 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         if (customWhiteLayer && map && map.hasLayer(customWhiteLayer))
           map.removeLayer(customWhiteLayer);
-      } catch {}
+      } catch { }
       customWhiteLayer = null;
     }
 
@@ -782,12 +782,12 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       try {
         if (_draftLine) removeLayerIfExists(_draftLine);
-      } catch {}
+      } catch { }
       _draftLine = null;
       for (const m of _draftMarkers)
         try {
           removeLayerIfExists(m);
-        } catch {}
+        } catch { }
       _draftMarkers = [];
       _draftWhite = null;
     }
@@ -831,7 +831,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // Tự vẽ nếu muốn lúc load
     try {
       drawCustomWhitePaths();
-    } catch (e) {}
+    } catch (e) { }
 
     initCampusPOIs();
     centerToCampus();
@@ -978,7 +978,7 @@ document.addEventListener("DOMContentLoaded", function () {
     host.style.display = "block";
     try {
       if (window.__centerNoticeTimer) clearTimeout(window.__centerNoticeTimer);
-    } catch {}
+    } catch { }
     window.__centerNoticeTimer = setTimeout(() => {
       host.style.display = "none";
     }, 2200);
@@ -1020,7 +1020,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (loading) {
       try {
         if (loadingHideTimer) clearTimeout(loadingHideTimer);
-      } catch {}
+      } catch { }
       loadingHideTimer = null;
       loadingStartedAt = Date.now();
       if (findBtn) {
@@ -1041,7 +1041,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (opts && typeof opts.onHidden === "function") {
           try {
             opts.onHidden();
-          } catch {}
+          } catch { }
         }
       };
       const elapsed = Date.now() - (loadingStartedAt || 0);
@@ -1049,7 +1049,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (delay > 0) {
         try {
           if (loadingHideTimer) clearTimeout(loadingHideTimer);
-        } catch {}
+        } catch { }
         loadingHideTimer = setTimeout(hide, delay);
       } else {
         hide();
@@ -1088,7 +1088,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (inFlight)
       try {
         inFlight.abort();
-      } catch {}
+      } catch { }
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     inFlight = controller;
@@ -1226,7 +1226,7 @@ document.addEventListener("DOMContentLoaded", function () {
       ) {
         map.removeLayer(layer);
       }
-    } catch {}
+    } catch { }
   }
 
   // Marker làm nổi bật vị trí xem/POI
@@ -1469,7 +1469,7 @@ document.addEventListener("DOMContentLoaded", function () {
         alert(
           "Trình duyệt có thể chặn định vị trên kết nối không bảo mật (http). Hãy truy cập bằng https hoặc localhost."
         );
-      } catch {}
+      } catch { }
     }
 
     // Lấy vị trí một lần và đặt làm điểm xuất phát
@@ -1520,7 +1520,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (hasBothInputs()) {
           try {
             guardedFindRoute();
-          } catch {}
+          } catch { }
           lastAutoRouteLatLng = ll;
         }
         if (geoBtn && geoBtn.dataset.originalText)
@@ -1608,8 +1608,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     const descriptionHtml = meta?.description
       ? `<div style="color:#e5e7eb;margin-top:6px">${escapeHtml(
-          meta.description
-        )}</div>`
+        meta.description
+      )}</div>`
       : "";
     const headerLabel = escapeHtml(
       (meta?.name || meta?.display_name || "").trim()
@@ -1624,11 +1624,10 @@ document.addEventListener("DOMContentLoaded", function () {
         <button id="overlay-close" style="background:#111827;border:1px solid rgba(255,255,255,.08);color:#e5e7eb;border-radius:8px;padding:6px 10px;cursor:pointer;">Đóng</button>
       </div>
       <div style="padding:14px 14px 8px 14px;line-height:1.65;">
-        ${
-          addrLines.length
-            ? `<div style="color:#cbd5e1">${addrLines.join("<br>")}</div>`
-            : ""
-        }
+        ${addrLines.length
+        ? `<div style="color:#cbd5e1">${addrLines.join("<br>")}</div>`
+        : ""
+      }
         ${descriptionHtml}
         <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
           <button id="set-as-start" style="background:linear-gradient(180deg,#10b981,#059669);color:#fff;border:none;padding:10px 12px;border-radius:10px;cursor:pointer;font-weight:600;">Điểm xuất phát</button>
@@ -1688,38 +1687,38 @@ document.addEventListener("DOMContentLoaded", function () {
     function buildPoiIcon(label, colorHint) {
       const safe = label
         ? String(label).replace(
-            /[<>&"]/g,
-            (s) =>
-              ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[s])
-          )
+          /[<>&"]/g,
+          (s) =>
+            ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[s])
+        )
         : "";
       const k = (label || "").toLowerCase();
       let color =
         colorHint || k.includes("thư viện")
           ? "#6366f1" // tím cho tòa / thư viện
           : k.includes("Nhà")
-          ? "#ef4444"
-          : k.includes("nhà xe")
-          ? "#f59e0b"
-          : k.includes("ký túc")
-          ? "#06b6d4"
-          : k.includes("cổng")
-          ? "#10b981"
-          : k.includes("sân")
-          ? "#3b82f6"
-          : k.includes("hồ")
-          ? "#0ea5e9"
-          : k.includes("nhà thi đấu")
-          ? "#8b5cf6"
-          : k.includes("pickleball")
-          ? "#f97316"
-          : k.includes("giáo")
-          ? "#eab308"
-          : k.includes("khu")
-          ? "#8cff00ff"
-          : k.includes("hiệu")
-          ? "#0ea5e9"
-          : "#e70384ff";
+            ? "#ef4444"
+            : k.includes("nhà xe")
+              ? "#f59e0b"
+              : k.includes("ký túc")
+                ? "#06b6d4"
+                : k.includes("cổng")
+                  ? "#10b981"
+                  : k.includes("sân")
+                    ? "#3b82f6"
+                    : k.includes("hồ")
+                      ? "#0ea5e9"
+                      : k.includes("nhà thi đấu")
+                        ? "#8b5cf6"
+                        : k.includes("pickleball")
+                          ? "#f97316"
+                          : k.includes("giáo")
+                            ? "#eab308"
+                            : k.includes("khu")
+                              ? "#8cff00ff"
+                              : k.includes("hiệu")
+                                ? "#0ea5e9"
+                                : "#e70384ff";
       const dotHtml = `<div style="width:10px;height:10px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 4px 8px rgba(0,0,0,.12)"></div>`;
       const labelHtml = `<div style="background:#fff;color:#0b1220;padding:6px 10px;border-radius:12px;font-weight:600;font-size:13px;white-space:nowrap;box-shadow:0 8px 20px rgba(11,18,32,.06);">${safe}</div>`;
       const html = `<div style="display:flex;align-items:center;gap:8px;transform:translateY(-8px)">${dotHtml}${labelHtml}</div>`;
@@ -2735,7 +2734,7 @@ document.addEventListener("DOMContentLoaded", function () {
           map.panTo(c, { animate: true, duration: 0.6 });
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const dist = totalPathDistanceMeters(coords);
     const speedMps = 1.2; // ~4.3 km/h
@@ -3158,17 +3157,17 @@ async function findSmartRoute(start, end) {
       s =
         startEl && startEl.dataset.lat && startEl.dataset.lng
           ? {
-              lat: parseFloat(startEl.dataset.lat),
-              lng: parseFloat(startEl.dataset.lng),
-            }
+            lat: parseFloat(startEl.dataset.lat),
+            lng: parseFloat(startEl.dataset.lng),
+          }
           : parseLatLng(startEl?.value);
     if (!t)
       t =
         endEl && endEl.dataset.lat && endEl.dataset.lng
           ? {
-              lat: parseFloat(endEl.dataset.lat),
-              lng: parseFloat(endEl.dataset.lng),
-            }
+            lat: parseFloat(endEl.dataset.lat),
+            lng: parseFloat(endEl.dataset.lng),
+          }
           : parseLatLng(endEl?.value);
     if (!s || !t) {
       showCenterNotice("Cần cả xuất phát và điểm đến", "error");
@@ -3308,7 +3307,7 @@ guardedFindRoute = async function () {
     const prev = new Array(N).fill(-1);
     const used = new Array(N).fill(false);
     dist[src] = 0;
-    for (;;) {
+    for (; ;) {
       let u = -1,
         best = Infinity;
       for (let i = 0; i < N; i++)
@@ -3466,7 +3465,7 @@ guardedFindRoute = async function () {
       try {
         if (typeof routeLine !== "undefined" && routeLine)
           removeLayerIfExists(routeLine);
-      } catch (e) {}
+      } catch (e) { }
       routeLine = L.polyline(
         reduced.map((p) => [p[0], p[1]]),
         { color: "#2563eb", weight: 6, opacity: 0.95, lineJoin: "round" }
@@ -3502,27 +3501,27 @@ guardedFindRoute = async function () {
       const s =
         startEl && startEl.dataset.lat && startEl.dataset.lng
           ? {
-              lat: parseFloat(startEl.dataset.lat),
-              lng: parseFloat(startEl.dataset.lng),
-            }
+            lat: parseFloat(startEl.dataset.lat),
+            lng: parseFloat(startEl.dataset.lng),
+          }
           : parseLatLng(startEl?.value)
-          ? {
+            ? {
               lat: parseLatLng(startEl.value)[0],
               lng: parseLatLng(startEl.value)[1],
             }
-          : null;
+            : null;
       const t =
         endEl && endEl.dataset.lat && endEl.dataset.lng
           ? {
-              lat: parseFloat(endEl.dataset.lat),
-              lng: parseFloat(endEl.dataset.lng),
-            }
+            lat: parseFloat(endEl.dataset.lat),
+            lng: parseFloat(endEl.dataset.lng),
+          }
           : parseLatLng(endEl?.value)
-          ? {
+            ? {
               lat: parseLatLng(endEl.value)[0],
               lng: parseLatLng(endEl.value)[1],
             }
-          : null;
+            : null;
       if (!s || !t) {
         showCenterNotice &&
           showCenterNotice("Cần cả xuất phát và điểm đến", "error");

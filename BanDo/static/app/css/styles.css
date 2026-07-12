@@ -639,3 +639,22 @@ body {
     }
 }
 
+/* Editor tool buttons */
+.editor-tool-btn.active {
+    background-color: #f59e0b !important;
+    color: #000 !important;
+    border-color: #f59e0b !important;
+    font-weight: 600;
+}
+.editor-tool-btn:hover:not(.active) {
+    opacity: 0.85;
+}
+
+/* Remove default Leaflet square border/background around POI markers */
+.custom-poi-marker-icon {
+    background: transparent !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+

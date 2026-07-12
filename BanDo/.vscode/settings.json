@@ -1,8 +1,18 @@
 {
     "python.analysis.extraPaths": [
+        ".",
         "./apps"
     ],
     "python.autoComplete.extraPaths": [
+        ".",
         "./apps"
+    ],
+    "python.analysis.typeCheckingMode": "off",
+    "python.analysis.ignore": [
+        "apps/locations/management/commands/rebuild_nodes.py",
+        "apps/locations/management/commands/rebuild_graph.py",
+        "apps/locations/management/commands/expand_graph.py",
+        "apps/locations/management/commands/clean_graph.py",
+        "apps/locations/management/commands/seed_map.py"
     ]
 }

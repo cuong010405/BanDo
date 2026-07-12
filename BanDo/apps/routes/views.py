@@ -7,7 +7,7 @@ from routes.pathfinder import (
     find_nearest_node, build_graph,
     run_dijkstra, run_a_star,
     generate_text_diagram, haversine_distance,
-    compute_remaining_distance, snap_to_road_graph
+    compute_remaining_distance
 )
 from history.models import SearchHistory
 
@@ -21,40 +21,45 @@ class RouteViewSet(viewsets.ReadOnlyModelViewSet):
         return Route.objects.filter(user=self.request.user).select_related('user')
 
 
-def _build_route_result(algorithm_label, path, geom, dist, visited, exec_time,
-                        nodes_dict, start_lat, start_lng):
+def _build_result(label, path, geometry, distance, visited, exec_time, nodes_dict,
+                  start_lat, start_lng, end_lat, end_lng):
     """
-    Build a standardised route result dict.
-    Prepends the raw GPS position as the very first geometry point so the
-    polyline always starts exactly at the user marker with no visual gap.
+    Chuẩn hóa kết quả một lần chạy thuật toán.
+    geometry đã bao gồm toàn bộ waypoints từ edge.points (reconstruct trong pathfinder).
+    Prepend [start_user] và append [end_user] để polyline khớp marker người dùng.
     """
-    clean_geom = []
-    for pt in geom:
-        if not clean_geom or pt != clean_geom[-1]:
-            clean_geom.append(pt)
-    if clean_geom and (clean_geom[0][0] != start_lat or clean_geom[0][1] != start_lng):
-        clean_geom = [[start_lat, start_lng]] + clean_geom
+    # Nối tọa độ thực của user vào đầu và cuối
+    full_geom = [[start_lat, start_lng]] + (geometry or []) + [[end_lat, end_lng]]
+
+    # Loại bỏ điểm trùng liên tiếp (so sánh epsilon nhỏ để tránh float rounding)
+    def _approx_eq(a, b, eps=1e-9):
+        return abs(a[0] - b[0]) < eps and abs(a[1] - b[1]) < eps
+
+    clean = []
+    for pt in full_geom:
+        if not clean or not _approx_eq(pt, clean[-1]):
+            clean.append(pt)
 
     return {
-        'algorithm': algorithm_label,
-        'complexity': 'O((V+E)logV)' if 'Dijkstra' in algorithm_label else 'O(E logV) with heuristic',
+        'algorithm': label,
+        'complexity': 'O((V+E)logV)' if 'Dijkstra' in label else 'O(E logV) with heuristic',
         'path_nodes': path,
-        'geometry': clean_geom,
-        'distance_m': round(dist, 2),
-        'distance_km': round(dist / 1000, 3),
-        'duration_s': round(dist / 1.2, 1),
+        'geometry': clean,
+        'distance_m': round(distance, 2),
+        'distance_km': round(distance / 1000, 3),
+        'duration_s': round(distance / 1.2, 1),
         'visited_nodes': visited,
         'exec_time_ms': round(exec_time, 4),
         'text_diagram': generate_text_diagram(path, nodes_dict),
-        'path_names': [nodes_dict[n][2] for n in path],
+        'path_names': [nodes_dict[n][2] for n in path if n in nodes_dict],
     }
 
 
 class CalculateRouteView(APIView):
     """
-    Core pathfinding API endpoint.
-    Snaps raw coordinates to the nearest road network segments (Map Matching / Snap-to-Road)
-    before running the Dijkstra/A* routing algorithm.
+    API tính đường ngắn nhất giữa 2 điểm.
+    Dùng Dijkstra (chuẩn) hoặc A* hoặc cả hai.
+    Geometry = tọa độ của các node trên path → polyline sạch, liên tục, không đứt.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -66,135 +71,140 @@ class CalculateRouteView(APIView):
             end_lat   = float(data.get('end_lat'))
             end_lng   = float(data.get('end_lng'))
         except (TypeError, ValueError):
-            return Response({'error': 'Invalid coordinates.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Tọa độ không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
 
         algorithm  = data.get('algorithm', 'both')
         start_name = data.get('start_name', f'{start_lat:.4f},{start_lng:.4f}')
         end_name   = data.get('end_name',   f'{end_lat:.4f},{end_lng:.4f}')
 
-        # 1. Snap start and end to active campus walkway edges
-        snap_start_lat, snap_start_lng, start_node_id, geom_to_start = snap_to_road_graph(start_lat, start_lng)
-        snap_end_lat, snap_end_lng, end_node_id, geom_to_end = snap_to_road_graph(end_lat, end_lng)
+        # 1. Tìm node gần nhất với điểm bắt đầu và kết thúc
+        start_node = find_nearest_node(start_lat, start_lng)
+        end_node   = find_nearest_node(end_lat, end_lng)
 
-        if not start_node_id or not end_node_id:
-            return Response({'error': 'Could not find nearby graph nodes.'},
-                            status=status.HTTP_404_NOT_FOUND)
+        if not start_node or not end_node:
+            return Response(
+                {'error': 'Không tìm thấy node nào trong bản đồ. Vui lòng thêm dữ liệu node/edge.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        # Pre-calculate snapping overhead distances
-        dist_to_start = 0.0
-        for i in range(len(geom_to_start) - 1):
-            dist_to_start += haversine_distance(geom_to_start[i][0], geom_to_start[i][1], geom_to_start[i+1][0], geom_to_start[i+1][1])
-
-        dist_to_end = 0.0
-        for i in range(len(geom_to_end) - 1):
-            dist_to_end += haversine_distance(geom_to_end[i][0], geom_to_end[i][1], geom_to_end[i+1][0], geom_to_end[i+1][1])
-
-        # If snapped to same edge node
-        if start_node_id == end_node_id:
-            distance = haversine_distance(snap_start_lat, snap_start_lng, snap_end_lat, snap_end_lng)
-            direct_result = {
-                'algorithm': 'A* (A-Star)',
-                'complexity': 'O(E logV) with heuristic',
-                'path_nodes': [start_node_id],
-                'geometry': [[start_lat, start_lng], [snap_start_lat, snap_start_lng], [snap_end_lat, snap_end_lng]],
+        # 2. Nếu 2 điểm cùng node → đường thẳng trực tiếp
+        if start_node.id == end_node.id:
+            distance = haversine_distance(start_lat, start_lng, end_lat, end_lng)
+            direct = {
+                'algorithm': 'Dijkstra',
+                'complexity': 'O((V+E)logV)',
+                'path_nodes': [start_node.id],
+                'geometry': [[start_lat, start_lng], [end_lat, end_lng]],
                 'distance_m': round(distance, 2),
                 'distance_km': round(distance / 1000, 3),
                 'duration_s': round(distance / 1.2, 1),
                 'visited_nodes': 1,
-                'exec_time_ms': 0.1,
-                'text_diagram': '[Kết nối trực tiếp đường đi]',
-                'path_names': ['Lộ trình đi thẳng'],
+                'exec_time_ms': 0.0,
+                'text_diagram': f'[{start_node.name or "Start"}] ➔ [Đích]',
+                'path_names': [start_node.name or 'Start'],
             }
-            result = {
-                'start': {'lat': start_lat, 'lng': start_lng, 'name': start_name, 'nearest_node': start_node_id},
-                'end':   {'lat': end_lat,   'lng': end_lng,   'name': end_name,   'nearest_node': end_node_id},
-                'graph_size': {'nodes': 1, 'edges': 1},
-                'primary': direct_result,
-                'dijkstra': direct_result,
-                'a_star': direct_result,
-            }
-            return Response(result, status=status.HTTP_200_OK)
+            return Response({
+                'start': {'lat': start_lat, 'lng': start_lng, 'name': start_name, 'nearest_node': start_node.id},
+                'end':   {'lat': end_lat,   'lng': end_lng,   'name': end_name,   'nearest_node': end_node.id},
+                'graph_size': {'nodes': 1, 'edges': 0},
+                'primary': direct, 'dijkstra': direct, 'a_star': direct,
+            }, status=status.HTTP_200_OK)
 
+        # 3. Xây graph
         nodes_dict, graph = build_graph()
 
-        if start_node_id not in nodes_dict or end_node_id not in nodes_dict:
-            return Response({'error': 'Node not found in graph.'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        if start_node.id not in nodes_dict or end_node.id not in nodes_dict:
+            return Response(
+                {'error': 'Node không tồn tại trong graph.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         result = {
-            'start': {'lat': start_lat, 'lng': start_lng, 'name': start_name, 'nearest_node': start_node_id},
-            'end':   {'lat': end_lat,   'lng': end_lng,   'name': end_name,   'nearest_node': end_node_id},
-            'graph_size': {'nodes': len(nodes_dict), 'edges': sum(len(v) for v in graph.values()) // 2},
+            'start': {'lat': start_lat, 'lng': start_lng, 'name': start_name, 'nearest_node': start_node.id},
+            'end':   {'lat': end_lat,   'lng': end_lng,   'name': end_name,   'nearest_node': end_node.id},
+            'graph_size': {
+                'nodes': len(nodes_dict),
+                'edges': sum(len(v) for v in graph.values()) // 2,
+            },
         }
 
         dijkstra_result = None
         a_star_result   = None
 
-        # Build full geometry: user -> snap_start -> start_node -> graph route -> end_node -> snap_end -> destination
-        # Note: geom_to_start starts at snapped user and ends at start_node_id
-        # geom_to_end starts at snapped target and ends at end_node_id (needs reverse from end_node_id to snapped target)
-        geom_from_end = list(reversed(geom_to_end))
-
+        # 4. Chạy Dijkstra
         if algorithm in ('dijkstra', 'both'):
-            d_path, d_geom, d_dist, d_visited, d_time = run_dijkstra(graph, start_node_id, end_node_id)
+            d_path, d_geom, d_dist, d_visited, d_time = run_dijkstra(
+                graph, nodes_dict, start_node.id, end_node.id
+            )
             if d_path:
-                full_d_geom = geom_to_start + d_geom + geom_from_end
-                full_d_dist = dist_to_start + d_dist + dist_to_end
-                dijkstra_result = _build_route_result(
-                    'Dijkstra', d_path, full_d_geom, full_d_dist, d_visited, d_time,
-                    nodes_dict, start_lat, start_lng)
+                dijkstra_result = _build_result(
+                    'Dijkstra', d_path, d_geom, d_dist, d_visited, d_time,
+                    nodes_dict, start_lat, start_lng, end_lat, end_lng
+                )
 
+        # 5. Chạy A*
         if algorithm in ('a_star', 'both'):
-            a_path, a_geom, a_dist, a_visited, a_time = run_a_star(graph, nodes_dict, start_node_id, end_node_id)
+            a_path, a_geom, a_dist, a_visited, a_time = run_a_star(
+                graph, nodes_dict, start_node.id, end_node.id
+            )
             if a_path:
-                full_a_geom = geom_to_start + a_geom + geom_from_end
-                full_a_dist = dist_to_start + a_dist + dist_to_end
-                a_star_result = _build_route_result(
-                    'A* (A-Star)', a_path, full_a_geom, full_a_dist, a_visited, a_time,
-                    nodes_dict, start_lat, start_lng)
+                a_star_result = _build_result(
+                    'A* (A-Star)', a_path, a_geom, a_dist, a_visited, a_time,
+                    nodes_dict, start_lat, start_lng, end_lat, end_lng
+                )
 
+        # Dijkstra là primary (đảm bảo tối ưu), fallback sang A*
         primary = dijkstra_result or a_star_result
         if not primary:
-            return Response({'error': 'No path found between these two locations.'},
-                            status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {'error': 'Không tìm thấy đường đi.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         result['dijkstra'] = dijkstra_result
         result['a_star']   = a_star_result
         result['primary']  = primary
 
+        # So sánh 2 thuật toán
         if dijkstra_result and a_star_result:
             result['comparison'] = {
-                'dijkstra_visited': dijkstra_result['visited_nodes'],
-                'a_star_visited':   a_star_result['visited_nodes'],
-                'dijkstra_time_ms': dijkstra_result['exec_time_ms'],
-                'a_star_time_ms':   a_star_result['exec_time_ms'],
-                'efficiency_gain':  round(
+                'dijkstra_visited':  dijkstra_result['visited_nodes'],
+                'a_star_visited':    a_star_result['visited_nodes'],
+                'dijkstra_time_ms':  dijkstra_result['exec_time_ms'],
+                'a_star_time_ms':    a_star_result['exec_time_ms'],
+                'efficiency_gain':   round(
                     (1 - a_star_result['visited_nodes'] / max(dijkstra_result['visited_nodes'], 1)) * 100, 1
                 ),
                 'same_distance': abs(dijkstra_result['distance_m'] - a_star_result['distance_m']) < 0.1,
             }
 
+        # Lưu lịch sử tìm kiếm
         try:
             user = request.user if request.user.is_authenticated else None
             SearchHistory.objects.create(
                 user=user, query=f"{start_name} -> {end_name}",
-                latitude=start_lat, longitude=start_lng)
+                latitude=start_lat, longitude=start_lng
+            )
         except Exception:
             pass
 
+        # Lưu route (nếu đã đăng nhập)
         try:
             if request.user.is_authenticated:
                 route = Route.objects.create(
-                    user=request.user, start_name=start_name[:255], end_name=end_name[:255],
+                    user=request.user,
+                    start_name=start_name[:255], end_name=end_name[:255],
                     start_latitude=start_lat, start_longitude=start_lng,
                     end_latitude=end_lat, end_longitude=end_lng,
                     distance=primary['distance_m'], duration=primary['duration_s'],
                     algorithm='dijkstra' if dijkstra_result else 'a_star',
-                    geometry=primary['geometry'])
+                    geometry=primary['geometry']
+                )
                 for seq, pt in enumerate(primary['geometry']):
                     if isinstance(pt, (list, tuple)) and len(pt) >= 2:
                         RoutePoint.objects.create(
-                            route=route, latitude=pt[0], longitude=pt[1], sequence=seq)
+                            route=route, latitude=pt[0], longitude=pt[1], sequence=seq
+                        )
         except Exception:
             pass
 
@@ -203,7 +213,7 @@ class CalculateRouteView(APIView):
 
 class RecalculateRouteView(APIView):
     """
-    Live rerouting endpoint with snap-to-road support.
+    Live rerouting: tính lại đường từ vị trí hiện tại người dùng đến đích.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -215,30 +225,20 @@ class RecalculateRouteView(APIView):
             end_lat  = float(data.get('end_lat'))
             end_lng  = float(data.get('end_lng'))
         except (TypeError, ValueError):
-            return Response({'error': 'Invalid coordinates.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Tọa độ không hợp lệ.'}, status=status.HTTP_400_BAD_REQUEST)
 
         end_name = data.get('end_name', f'{end_lat:.4f},{end_lng:.4f}')
 
-        # Snap coordinates to road segments
-        snap_user_lat, snap_user_lng, start_node_id, geom_to_start = snap_to_road_graph(user_lat, user_lng)
-        snap_end_lat, snap_end_lng, end_node_id, geom_to_end = snap_to_road_graph(end_lat, end_lng)
+        start_node = find_nearest_node(user_lat, user_lng)
+        end_node   = find_nearest_node(end_lat, end_lng)
 
-        if not start_node_id or not end_node_id:
-            return Response({'error': 'No nearby nodes found.'}, status=status.HTTP_404_NOT_FOUND)
+        if not start_node or not end_node:
+            return Response({'error': 'Không tìm thấy node gần đó.'}, status=status.HTTP_404_NOT_FOUND)
 
-        dist_to_start = 0.0
-        for i in range(len(geom_to_start) - 1):
-            dist_to_start += haversine_distance(geom_to_start[i][0], geom_to_start[i][1], geom_to_start[i+1][0], geom_to_start[i+1][1])
-
-        dist_to_end = 0.0
-        for i in range(len(geom_to_end) - 1):
-            dist_to_end += haversine_distance(geom_to_end[i][0], geom_to_end[i][1], geom_to_end[i+1][0], geom_to_end[i+1][1])
-
-        if start_node_id == end_node_id:
-            distance = haversine_distance(snap_user_lat, snap_user_lng, snap_end_lat, snap_end_lng)
-            clean_geom = [[user_lat, user_lng], [snap_user_lat, snap_user_lng], [snap_end_lat, snap_end_lng]]
+        if start_node.id == end_node.id:
+            distance = haversine_distance(user_lat, user_lng, end_lat, end_lng)
             return Response({
-                'geometry':    clean_geom,
+                'geometry':    [[user_lat, user_lng], [end_lat, end_lng]],
                 'distance_m':  round(distance, 2),
                 'distance_km': round(distance / 1000, 3),
                 'duration_s':  round(distance / 1.2, 1),
@@ -246,26 +246,25 @@ class RecalculateRouteView(APIView):
             }, status=status.HTTP_200_OK)
 
         nodes_dict, graph = build_graph()
-        a_path, a_geom, a_dist, _, _ = run_a_star(graph, nodes_dict, start_node_id, end_node_id)
 
-        if not a_path:
-            return Response({'error': 'No path found.'}, status=status.HTTP_404_NOT_FOUND)
+        d_path, d_geom, d_dist, _, _ = run_dijkstra(graph, nodes_dict, start_node.id, end_node.id)
 
-        geom_from_end = list(reversed(geom_to_end))
-        full_a_geom = geom_to_start + a_geom + geom_from_end
-        full_a_dist = dist_to_start + a_dist + dist_to_end
+        if not d_path:
+            return Response({'error': 'Không tìm thấy đường đi.'}, status=status.HTTP_404_NOT_FOUND)
 
-        clean_geom = []
-        for pt in full_a_geom:
-            if not clean_geom or pt != clean_geom[-1]:
-                clean_geom.append(pt)
-        if clean_geom and (clean_geom[0][0] != user_lat or clean_geom[0][1] != user_lng):
-            clean_geom = [[user_lat, user_lng]] + clean_geom
+        # Thêm tọa độ người dùng và đích thực vào geometry
+        full_geom = [[user_lat, user_lng]] + d_geom + [[end_lat, end_lng]]
+        clean = []
+        for pt in full_geom:
+            if not clean or pt != clean[-1]:
+                clean.append(pt)
 
         return Response({
-            'geometry':    clean_geom,
-            'distance_m':  round(full_a_dist, 2),
-            'distance_km': round(full_a_dist / 1000, 3),
-            'duration_s':  round(full_a_dist / 1.2, 1),
+            'geometry':    clean,
+            'distance_m':  round(d_dist, 2),
+            'distance_km': round(d_dist / 1000, 3),
+            'duration_s':  round(d_dist / 1.2, 1),
             'end_name':    end_name,
         }, status=status.HTTP_200_OK)
+
+

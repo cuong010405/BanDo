@@ -13,4 +13,5 @@ urlpatterns = [
     path('feedbacks/reply/<int:feedback_id>/', views.reply_feedback, name='reply_feedback'),
     path('routes/', views.routes, name='routes'),
     path('notifications/', views.notifications, name='notifications'),
+    path('dev-login/', views.dev_auto_login, name='dev_auto_login'),
 ]

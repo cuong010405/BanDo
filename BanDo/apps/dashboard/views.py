@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, logout, authenticate, get_user_model
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Avg, Count
@@ -14,14 +14,73 @@ from feedback.models import Feedback, Report
 from notifications.models import Notification
 from core.models import AuditLog
 
+# ================= DEV AUTO LOGIN =================
+
+def dev_auto_login(request):
+    """Dev-only: auto login as admin and redirect to admin dashboard."""
+    from django.conf import settings
+    if not settings.DEBUG:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Only available in DEBUG mode")
+    
+    User = get_user_model()
+    try:
+        user = User.objects.filter(is_superuser=True).first()
+        if user:
+            user.backend = 'django.contrib.auth.backends.ModelBackend'
+            login(request, user)
+            return redirect('/admin/')
+        else:
+            return redirect('/admin/login/')
+    except Exception as e:
+        return redirect('/admin/login/')
+
 # ================= CLIENT VIEWS =================
 
 def giao_dien_chinh(request):
     """Main client map interface."""
+    import json
+    from routes.pathfinder import is_edge_valid, point_in_polygon, BUILDING_POLYGONS
+
     categories = Category.objects.all()
     locations = Location.objects.filter(is_active=True).select_related('category')
     nodes = RouteNode.objects.all()
     edges = RouteEdge.objects.filter(is_active=True).select_related('node_a', 'node_b')
+
+    nodes_list = []
+    for n in nodes:
+        lat_f = float(n.latitude)
+        lng_f = float(n.longitude)
+        inside_building = False
+        for poly in BUILDING_POLYGONS:
+            if point_in_polygon(lat_f, lng_f, poly):
+                inside_building = True
+                break
+        
+        nodes_list.append({
+            'id': n.id,
+            'lat': lat_f,
+            'lng': lng_f,
+            'name': n.name or "",
+            'is_on_walkway': not inside_building
+        })
+
+    edges_list = []
+    for edge in edges:
+        lat_a = float(edge.node_a.latitude)
+        lng_a = float(edge.node_a.longitude)
+        lat_b = float(edge.node_b.latitude)
+        lng_b = float(edge.node_b.longitude)
+        valid = is_edge_valid(lat_a, lng_a, lat_b, lng_b)
+        
+        edges_list.append({
+            'id': edge.id,
+            'node_a': edge.node_a.id,
+            'node_b': edge.node_b.id,
+            'distance': edge.distance,
+            'is_valid': valid,
+            'is_new': edge.id > 282
+        })
     
     # Fetch active notifications for authenticated user
     user_notifications = []
@@ -37,8 +96,9 @@ def giao_dien_chinh(request):
     context = {
         'categories': categories,
         'locations': locations,
-        'nodes': nodes,
-        'edges': edges,
+        'nodes_json': json.dumps(nodes_list),
+        'edges_json': json.dumps(edges_list),
+        'building_polygons_json': json.dumps(BUILDING_POLYGONS),
         'notifications': user_notifications,
         'uat_report': uat_report,
     }
@@ -343,6 +403,8 @@ def routes(request):
     if not is_staff_check(request.user):
         return redirect('client:login')
 
+    from routes.pathfinder import BUILDING_POLYGONS
+
     # Basic stats
     node_count = RouteNode.objects.count()
     edge_count = RouteEdge.objects.count()
@@ -362,8 +424,10 @@ def routes(request):
         'page_obj': page_obj,
         'nodes': nodes,
         'edges': edges,
+        'building_polygons': BUILDING_POLYGONS,
     }
     return render(request, 'dashboard/routes.html', context)
+
 
 
 def notifications(request):

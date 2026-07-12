@@ -2,14 +2,15 @@ import os
 import sys
 from pathlib import Path
 from datetime import timedelta
-# Bypass Django 5.x database version validation for MariaDB 10.4
-import django.db.backends.base.base
-django.db.backends.base.base.BaseDatabaseWrapper.check_database_version_supported = lambda self: None
-
-# Disable RETURNING clause for compatibility with MariaDB < 10.5
-from django.db.backends.mysql.features import DatabaseFeatures
-DatabaseFeatures.can_return_columns_from_insert = False
-DatabaseFeatures.can_return_rows_from_bulk_insert = False
+# Bypass Django 5.x database version validation for MariaDB 10.4 (only for MySQL)
+try:
+    import django.db.backends.base.base
+    django.db.backends.base.base.BaseDatabaseWrapper.check_database_version_supported = lambda self: None
+    from django.db.backends.mysql.features import DatabaseFeatures
+    DatabaseFeatures.can_return_columns_from_insert = False
+    DatabaseFeatures.can_return_rows_from_bulk_insert = False
+except Exception:
+    pass
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -94,19 +95,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'BanDo.wsgi.application'
 
-# MySQL Database configuration
+# Database — SQLite for local dev (MySQL not available)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'mapdthu',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': '127.0.0.1',
-        'PORT': '3306',
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            'charset': 'utf8mb4',
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 

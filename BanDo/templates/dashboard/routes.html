@@ -1,0 +1,602 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load l10n %}
+
+{% block title %}Biên tập mạng lưới đường đi - DTHU Dashboard{% endblock %}
+
+{% block content %}
+<div class="bo-cuc-chinh d-flex flex-column vh-100 bg-dark text-white overflow-hidden">
+    <!-- Navbar Header -->
+    <header class="navbar navbar-dark bg-glass-dark border-bottom border-secondary px-4 py-2 flex-shrink-0 d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'client:giao_dien_chinh' %}" class="btn btn-sm btn-outline-secondary rounded-pill me-2"><i class="fa-solid fa-arrow-left me-1"></i>Bản đồ</a>
+            <span class="navbar-brand m-0 text-white fw-bold d-flex align-items-center gap-2">
+                <i class="fa-solid fa-gauge text-primary"></i> DTHU DASHBOARD
+            </span>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <span class="small text-success"><i class="fa-solid fa-user-shield me-1"></i>Quản trị viên: {{ request.user.username }}</span>
+            <a href="{% url 'client:logout' %}" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="fa-solid fa-right-from-bracket me-1"></i>Đăng xuất</a>
+        </div>
+    </header>
+
+    <!-- Workspace -->
+    <div class="d-flex flex-grow-1 overflow-hidden">
+        <!-- Sidebar -->
+        <nav class="sidebar bg-glass-dark border-end border-secondary flex-shrink-0 p-3 overflow-y-auto" style="width: 250px;">
+            <div class="list-group list-group-flush rounded-3">
+                <a href="{% url 'dashboard:overview' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-chart-pie me-2 text-primary"></i>Tổng quan
+                </a>
+                <a href="{% url 'dashboard:locations' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-location-dot me-2 text-primary"></i>Quản lý địa điểm
+                </a>
+                <a href="{% url 'dashboard:routes' %}" class="list-group-item list-group-item-action bg-primary text-white border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-circle-nodes me-2"></i>Mạng lưới đường đi
+                </a>
+                <a href="{% url 'dashboard:users' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-users me-2 text-primary"></i>Quản lý tài khoản
+                </a>
+                <a href="{% url 'dashboard:feedbacks' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-comments me-2 text-primary"></i>Quản lý phản hồi
+                </a>
+                <a href="{% url 'dashboard:notifications' %}" class="list-group-item list-group-item-action bg-transparent text-white-50 hover-bg-secondary border-0 rounded py-3 mb-2 px-3 fw-medium">
+                    <i class="fa-solid fa-bell me-2 text-primary"></i>Gửi thông báo
+                </a>
+            </div>
+        </nav>
+
+        <!-- Main Workspace splits into table history (left) and map nodes editor (right) -->
+        <main class="flex-grow-1 d-flex overflow-hidden">
+            <!-- Left panel: routes computation history -->
+            <div class="w-50 h-100 p-4 border-end border-secondary d-flex flex-column overflow-hidden">
+                <h4 class="fw-bold mb-3">Lịch sử tính toán tuyến đường</h4>
+                
+                <div class="table-responsive flex-grow-1 border border-secondary rounded mb-3 bg-dark-card overflow-y-auto">
+                    <table class="table table-dark table-striped align-middle table-hover m-0 small">
+                        <thead>
+                            <tr class="table-active">
+                                <th>Người dùng</th>
+                                <th>Tuyến đường</th>
+                                <th class="text-end">Khoảng cách</th>
+                                <th class="text-center">Thuật toán</th>
+                                <th>Thời gian tạo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in page_obj %}
+                                <tr style="cursor: pointer;" onclick="drawSavedRoute({{ r.geometry }})">
+                                    <td><strong>{{ r.user.username|default:"Vãng lai" }}</strong></td>
+                                    <td><span class="text-white-50 small">{{ r.start_name }}</span> ➔ <span class="text-white-50 small">{{ r.end_name }}</span></td>
+                                    <td class="text-end font-monospace">{{ r.distance|floatformat:1 }}m</td>
+                                    <td class="text-center"><span class="badge bg-primary">{{ r.get_algorithm_display }}</span></td>
+                                    <td class="small">{{ r.created_at|date:"d/m H:i" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-white-50 py-3">Chưa có lịch sử tính tuyến đường.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <nav class="d-flex justify-content-between align-items-center">
+                    <span class="small text-white-50">Trang {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    <ul class="pagination pagination-sm m-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item"><a class="page-link bg-dark border-secondary text-white" href="?page={{ page_obj.previous_page_number }}">&laquo; Trước</a></li>
+                        {% endif %}
+                        {% if page_obj.has_next %}
+                            <li class="page-item"><a class="page-link bg-dark border-secondary text-white" href="?page={{ page_obj.next_page_number }}">Tiếp &raquo;</a></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+
+            <!-- Right panel: graph nodes and edges visualization map & Graph Editor -->
+            <div class="w-50 h-100 p-4 d-flex flex-column overflow-hidden">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h5 class="fw-bold m-0"><i class="fa-solid fa-circle-nodes text-primary me-2"></i>Biên tập đồ thị Campus</h5>
+                </div>
+
+                <!-- Editor Toolbar -->
+                <div class="d-flex gap-2 mb-2">
+                    <div class="btn-group btn-group-sm flex-grow-1 border border-secondary rounded-3 overflow-hidden bg-dark">
+                        <input type="radio" class="btn-check" name="editor-mode" id="mode-view" value="view" checked>
+                        <label class="btn btn-outline-primary border-0 py-2" for="mode-view"><i class="fa-solid fa-eye me-1"></i>Xem</label>
+                        <input type="radio" class="btn-check" name="editor-mode" id="mode-add-node" value="add-node">
+                        <label class="btn btn-outline-success border-0 py-2" for="mode-add-node"><i class="fa-solid fa-circle-plus me-1"></i>+ Nút</label>
+                        <input type="radio" class="btn-check" name="editor-mode" id="mode-add-edge" value="add-edge">
+                        <label class="btn btn-outline-warning border-0 py-2" for="mode-add-edge"><i class="fa-solid fa-route me-1"></i>+ Cạnh</label>
+                        <input type="radio" class="btn-check" name="editor-mode" id="mode-delete" value="delete">
+                        <label class="btn btn-outline-danger border-0 py-2" for="mode-delete"><i class="fa-solid fa-trash-can me-1"></i>Xoá</label>
+                    </div>
+                </div>
+
+                <div class="alert alert-info py-2 px-3 small border-0 bg-glass-dark text-info mb-3" id="editor-hint">
+                    <i class="fa-solid fa-circle-info me-1"></i> Đang ở chế độ xem đồ thị. Chọn chế độ khác để biên tập trực tiếp.
+                </div>
+                
+                <div class="flex-grow-1 border border-secondary rounded overflow-hidden position-relative">
+                    <div id="graph-map" class="w-100 h-100"></div>
+                    <div class="graph-stats-overlay" id="graph-stats-badge">{{ node_count }} Nodes | {{ edge_count }} Edges</div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- Raw Nodes/Edges data injected as JSON -->
+{% localize off %}
+<script id="nodes-json" type="application/json">
+[
+    {% for node in nodes %}
+    {
+        "id": {{ node.id }},
+        "lat": {{ node.latitude }},
+        "lng": {{ node.longitude }},
+        "name": "{% if node.name %}{{ node.name|escapejs }}{% endif %}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+
+<script id="edges-json" type="application/json">
+[
+    {% for edge in edges %}
+    {
+        "id": {{ edge.id }},
+        "node_a": {{ edge.node_a.id }},
+        "node_b": {{ edge.node_b.id }},
+        "distance": {{ edge.distance }},
+        "points": {{ edge.points|safe }}
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+
+<script id="building-polygons-json" type="application/json">
+{{ building_polygons|safe }}
+</script>
+{% endlocalize %}
+
+{% endblock %}
+
+{% block extra_js %}
+<style>
+    .node-id-label {
+        font-size: 10px;
+        font-weight: 600;
+        color: #1a1a1a;
+        background: rgba(255,255,255,0.85);
+        padding: 1px 4px;
+        border-radius: 3px;
+        white-space: nowrap;
+        pointer-events: none;
+        line-height: 1.2;
+        text-align: center;
+        border: 1px solid rgba(0,0,0,0.1);
+        transform: translate(-50%, -100%);
+        margin-top: -8px;
+    }
+    .node-id-label.selected {
+        color: #1e40af;
+        background: rgba(219,234,254,0.95);
+        font-weight: 700;
+        border-color: #3b82f6;
+        font-size: 11px;
+    }
+    .graph-stats-overlay {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+        background: rgba(15,23,42,0.88);
+        color: #e2e8f0;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        backdrop-filter: blur(6px);
+        border: 1px solid rgba(255,255,255,0.1);
+        pointer-events: none;
+    }
+    .edge-info-popup {
+        font-size: 12px;
+        color: #1e293b;
+        font-weight: 600;
+        padding: 2px 0;
+    }
+    .toast-editor {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        background: #0f172a;
+        color: #f1f5f9;
+        padding: 10px 24px;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
+    .toast-editor.show { opacity: 1; }
+</style>
+
+<script>
+    let map, activeRouteLine;
+    let nodeLayerGroup, edgeLayerGroup;
+    let currentMode = 'view';
+    let firstSelectedNode = null;
+
+    const campusCenter = [10.4206, 105.6436];
+    const NODE_DOT_SIZE = 10;
+    const NODE_DOT_SELECTED_SIZE = 14;
+
+    let nodes = JSON.parse(document.getElementById('nodes-json').textContent);
+    let edges = JSON.parse(document.getElementById('edges-json').textContent);
+    let buildingPolygons = JSON.parse(document.getElementById('building-polygons-json').textContent || '[]');
+
+    // ==========================================
+    // TOAST
+    // ==========================================
+    function showToast(msg) {
+        let t = document.getElementById('editor-toast');
+        if (!t) {
+            t = document.createElement('div');
+            t.id = 'editor-toast';
+            t.className = 'toast-editor';
+            document.body.appendChild(t);
+        }
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(t._timer);
+        t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ==========================================
+    // GEOMETRIC HELPERS
+    // ==========================================
+    function pointInPolygon(lat, lng, poly) {
+        let n = poly.length, inside = false;
+        let p1x = poly[0][0], p1y = poly[0][1];
+        for (let i = 0; i <= n; i++) {
+            let p2x = poly[i % n][0], p2y = poly[i % n][1];
+            if (lng > Math.min(p1y, p2y) && lng <= Math.max(p1y, p2y) && lat <= Math.max(p1x, p2x)) {
+                if (p1y !== p2y) {
+                    let xinters = (lng - p1y) * (p2x - p1x) / (p2y - p1y) + p1x;
+                    if (p1x === p2x || lat <= xinters) inside = !inside;
+                }
+            }
+            p1x = p2x; p1y = p2y;
+        }
+        return inside;
+    }
+
+    function lineIntersection(p1, p2, p3, p4) {
+        let x1=p1[0],y1=p1[1],x2=p2[0],y2=p2[1],x3=p3[0],y3=p3[1],x4=p4[0],y4=p4[1];
+        let denom = (y4-y3)*(x2-x1)-(x4-x3)*(y2-y1);
+        if (denom === 0) return false;
+        let ua = ((x4-x3)*(y1-y3)-(y4-y3)*(x1-x3))/denom;
+        let ub = ((x2-x1)*(y1-y3)-(y2-y1)*(x1-x3))/denom;
+        return ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1;
+    }
+
+    function isEdgeValid(latA, lngA, latB, lngB) {
+        for (let poly of buildingPolygons) {
+            if (pointInPolygon(latA, lngA, poly) || pointInPolygon(latB, lngB, poly)) return false;
+            let n = poly.length;
+            for (let i = 0; i < n; i++) {
+                if (lineIntersection([latA,lngA],[latB,lngB], poly[i], poly[(i+1)%n])) return false;
+            }
+        }
+        return true;
+    }
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+        const toRad = x => x * Math.PI / 180;
+        const R = 6371000;
+        const dLat = toRad(lat2-lat1), dLon = toRad(lon2-lon1);
+        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function getCookie(name) {
+        if (!document.cookie) return null;
+        for (const c of document.cookie.split(';')) {
+            const cv = c.trim();
+            if (cv.startsWith(name + '=')) return decodeURIComponent(cv.slice(name.length + 1));
+        }
+        return null;
+    }
+
+    // ==========================================
+    // NODE DOT ICON
+    // ==========================================
+    function makeNodeIcon(isSelected, size) {
+        const s = size || (isSelected ? NODE_DOT_SELECTED_SIZE : NODE_DOT_SIZE);
+        const color = isSelected ? '#2563eb' : '#ef4444';
+        const border = isSelected ? '#ffffff' : '#991b1b';
+        const shadow = isSelected ? '0 0 8px rgba(37,99,235,0.6)' : '0 0 3px rgba(0,0,0,0.5)';
+        return L.divIcon({
+            html: `<div style="width:${s}px;height:${s}px;background:${color};border:2px solid ${border};border-radius:50%;box-shadow:${shadow};"></div>`,
+            className: '',
+            iconSize: [s, s],
+            iconAnchor: [s/2, s/2]
+        });
+    }
+
+
+
+    // ==========================================
+    // DRAW GRAPH
+    // ==========================================
+    function drawGraph(nodeList, edgeList) {
+        nodeLayerGroup.clearLayers();
+        edgeLayerGroup.clearLayers();
+
+        const nodePosMap = {};
+
+        // Draw Nodes
+        nodeList.forEach(node => {
+            const isSelected = firstSelectedNode && firstSelectedNode.id === node.id;
+            const marker = L.marker([node.lat, node.lng], {
+                icon: makeNodeIcon(isSelected),
+                draggable: true,
+                zIndexOffset: isSelected ? 2000 : 1000
+            }).addTo(nodeLayerGroup);
+
+            // Drag: check placement on drop
+            let originalLatLng = null;
+            marker.on('dragstart', e => {
+                originalLatLng = e.target.getLatLng();
+            });
+            marker.on('dragend', async e => {
+                const ll = e.target.getLatLng();
+                const lat = ll.lat, lng = ll.lng;
+                let inBuilding = false;
+                for (let poly of buildingPolygons) {
+                    if (pointInPolygon(lat, lng, poly)) { inBuilding = true; break; }
+                }
+                if (inBuilding) {
+                    showToast('Nút không thể kéo vào trong tòa nhà!');
+                    e.target.setLatLng(originalLatLng);
+                    return;
+                }
+                let invalidEdge = false;
+                for (let edge of edges) {
+                    if (edge.node_a === node.id || edge.node_b === node.id) {
+                        let otherId = edge.node_a === node.id ? edge.node_b : edge.node_a;
+                        let other = nodes.find(n => n.id === otherId);
+                        if (other && !isEdgeValid(lat, lng, other.lat, other.lng)) { invalidEdge = true; break; }
+                    }
+                }
+                if (invalidEdge) {
+                    showToast('Đường nối sẽ đi xuyên tòa nhà!');
+                    e.target.setLatLng(originalLatLng);
+                    return;
+                }
+                try {
+                    const res = await fetch(`/api/route-nodes/${node.id}/`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                        body: JSON.stringify({ latitude: lat.toFixed(6), longitude: lng.toFixed(6) })
+                    });
+                    if (res.ok) await fetchAndRedrawGraph();
+                    else { showToast('Lỗi lưu vị trí nút'); e.target.setLatLng(originalLatLng); }
+                } catch(err) { console.error(err); e.target.setLatLng(originalLatLng); }
+            });
+
+            // Click: handle node action
+            marker.on('click', e => {
+                L.DomEvent.stopPropagation(e);
+                handleNodeClick(node, marker);
+            });
+
+            nodePosMap[node.id] = [node.lat, node.lng];
+        });
+
+        // Draw Edges
+        edgeList.forEach(edge => {
+            let pts = edge.points;
+            if (!pts || pts.length < 2) {
+                const a = nodePosMap[edge.node_a], b = nodePosMap[edge.node_b];
+                if (a && b) pts = [a, b];
+            }
+            if (pts && pts.length >= 2) {
+                const pl = L.polyline(pts, { color: '#6b7280', weight: 4, opacity: 0.8 }).addTo(edgeLayerGroup);
+                pl.on('click', e => { L.DomEvent.stopPropagation(e); handleEdgeClick(edge); });
+            }
+        });
+
+        updateStats();
+    }
+
+    // ==========================================
+    // STATS
+    // ==========================================
+    function updateStats() {
+        const el = document.getElementById('graph-stats-badge');
+        if (el) el.textContent = `${nodes.length} Nodes | ${edges.length} Edges`;
+    }
+
+    // ==========================================
+    // CLICK HANDLERS
+    // ==========================================
+    async function handleMapClick(e) {
+        if (currentMode !== 'add-node') return;
+        const lat = e.latlng.lat, lng = e.latlng.lng;
+        for (let poly of buildingPolygons) {
+            if (pointInPolygon(lat, lng, poly)) { showToast('Nút không thể nằm trong tòa nhà!'); return; }
+        }
+        const name = prompt('Nhập tên nút (bỏ trống nếu không cần):');
+        if (name === null) return;
+        try {
+            const res = await fetch('/api/route-nodes/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify({ latitude: lat.toFixed(6), longitude: lng.toFixed(6), name: name.trim() || null })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                showToast(`Đã tạo Node #${data.id}`);
+                await fetchAndRedrawGraph();
+            } else {
+                const err = await res.json();
+                showToast('Lỗi: ' + (err.detail || JSON.stringify(err)));
+            }
+        } catch(err) { console.error(err); }
+    }
+
+    async function handleNodeClick(node, marker) {
+        if (currentMode === 'delete') {
+            if (confirm(`Xoá Nút ${node.id}? Tất cả đường nối liên kết sẽ bị xoá.`)) {
+                try {
+                    const res = await fetch(`/api/route-nodes/${node.id}/`, {
+                        method: 'DELETE',
+                        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                    });
+                    if (res.ok) { showToast(`Đã xoá Node #${node.id}`); await fetchAndRedrawGraph(); }
+                    else showToast('Lỗi xoá nút');
+                } catch(err) { console.error(err); }
+            }
+        } else if (currentMode === 'add-edge') {
+            if (!firstSelectedNode) {
+                firstSelectedNode = node;
+                marker.setIcon(makeNodeIcon(true, NODE_DOT_SELECTED_SIZE));
+                marker.setZIndexOffset(2000);
+                document.getElementById('editor-hint').innerHTML =
+                    `<i class="fa-solid fa-route me-1"></i> <b>${node.id}</b> → ?  Chọn nút đích để tạo cạnh.`;
+            } else {
+                if (firstSelectedNode.id === node.id) { resetSelection(); return; }
+                const nA = firstSelectedNode, nB = node;
+                if (!isEdgeValid(nA.lat, nA.lng, nB.lat, nB.lng)) {
+                    showToast('Cạnh đi xuyên tòa nhà!');
+                    resetSelection();
+                    return;
+                }
+                const dist = haversineDistance(nA.lat, nA.lng, nB.lat, nB.lng);
+                try {
+                    const res = await fetch('/api/route-edges/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                        body: JSON.stringify({
+                            node_a: nA.id, node_b: nB.id,
+                            distance: Math.round(dist * 100) / 100,
+                            points: [[nA.lat, nA.lng], [nB.lat, nB.lng]]
+                        })
+                    });
+                    if (res.ok) {
+                        showToast(`Đã tạo cạnh: ${nA.id} → ${nB.id}`);
+                        resetSelection();
+                        await fetchAndRedrawGraph();
+                    } else {
+                        const err = await res.json();
+                        showToast('Lỗi: ' + (err.detail || JSON.stringify(err)));
+                        resetSelection();
+                    }
+                } catch(err) { console.error(err); resetSelection(); }
+            }
+        }
+    }
+
+    async function handleEdgeClick(edge) {
+        if (currentMode !== 'delete') return;
+        if (confirm(`Xoá cạnh #${edge.id} (${edge.node_a} → ${edge.node_b})?`)) {
+            try {
+                const res = await fetch(`/api/route-edges/${edge.id}/`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRFToken': getCookie('csrftoken') }
+                });
+                if (res.ok) { showToast(`Đã xoá cạnh #${edge.id}`); await fetchAndRedrawGraph(); }
+                else showToast('Lỗi xoá cạnh');
+            } catch(err) { console.error(err); }
+        }
+    }
+
+    // ==========================================
+    // FETCH & REDRAW
+    // ==========================================
+    async function fetchAndRedrawGraph() {
+        try {
+            const [nRes, eRes] = await Promise.all([fetch('/api/route-nodes/'), fetch('/api/route-edges/')]);
+            const rawN = await nRes.json();
+            nodes = rawN.map(n => ({ id: n.id, lat: parseFloat(n.latitude), lng: parseFloat(n.longitude), name: n.name }));
+            edges = await eRes.json();
+            drawGraph(nodes, edges);
+        } catch(e) { console.error(e); }
+    }
+
+    function resetSelection() {
+        firstSelectedNode = null;
+        selectedNodeId = null;
+        drawGraph(nodes, edges);
+        if (currentMode === 'add-edge') {
+            document.getElementById('editor-hint').innerHTML =
+                `<i class="fa-solid fa-route me-1"></i> Chế độ thêm cạnh. Click nút gốc, rồi nút đích.`;
+        }
+    }
+
+    function drawSavedRoute(geometry) {
+        if (!geometry || geometry.length < 2) return;
+        if (activeRouteLine) map.removeLayer(activeRouteLine);
+        activeRouteLine = L.polyline(geometry, { color: '#10b981', weight: 6, opacity: 0.9 }).addTo(map);
+        map.fitBounds(activeRouteLine.getBounds());
+    }
+
+    // ==========================================
+    // INIT
+    // ==========================================
+    document.addEventListener("DOMContentLoaded", function () {
+        map = L.map('graph-map', { fullscreenControl: true }).setView(campusCenter, 17);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        nodeLayerGroup = L.layerGroup().addTo(map);
+        edgeLayerGroup = L.layerGroup().addTo(map);
+
+        // Shared style: tòa nhà + sân thể thao → xanh dương
+        const POLYGON_STYLE = {
+            color: '#2563EB',
+            weight: 2,
+            opacity: 1,
+            fillColor: '#60A5FA',
+            fillOpacity: 0.15,
+            interactive: false
+        };
+
+        // Draw all obstacle polygons (buildings + sports areas)
+        buildingPolygons.forEach(poly => {
+            L.polygon(poly, POLYGON_STYLE).addTo(map);
+        });
+
+        drawGraph(nodes, edges);
+        map.on('click', handleMapClick);
+
+        // Mode switch
+        document.querySelectorAll('input[name="editor-mode"]').forEach(radio => {
+            radio.addEventListener('change', function () {
+                currentMode = this.value;
+                resetSelection();
+                const hint = document.getElementById('editor-hint');
+                const modes = {
+                    'view':     ['alert-info', 'text-info', 'Chế độ xem. Kéo nút để di chuyển. Click danh sách bên trái để xem đường đi.'],
+                    'add-node': ['alert-success', 'text-success', 'Chế độ thêm nút. Click trên bản đồ để thêm.'],
+                    'add-edge': ['alert-warning', 'text-warning', 'Chế độ thêm cạnh. Click nút gốc → nút đích.'],
+                    'delete':   ['alert-danger', 'text-danger', 'Chế độ xoá. Click lên nút hoặc cạnh để xoá.']
+                };
+                const m = modes[currentMode] || modes['view'];
+                hint.className = `alert py-2 px-3 small border-0 bg-glass-dark ${m[1]} mb-3`;
+                hint.innerHTML = `<i class="fa-solid fa-circle-info me-1"></i> ${m[2]}`;
+            });
+        });
+    });
+</script>
+{% endblock %}

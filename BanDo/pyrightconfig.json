@@ -1,0 +1,18 @@
+{
+  "include": ["."],
+  "extraPaths": [".", "apps"],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__"
+  ],
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportOperatorIssue": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportCallIssue": "none",
+  "reportIndexIssue": "none",
+  "venvPath": ".",
+  "pythonVersion": "3.11"
+}

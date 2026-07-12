@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*$py.class
+db.sqlite3
+*.log
+.vscode/
+.mimocode/
+.qodo/
+.sixth/
+.kombai/
+django_debug.log

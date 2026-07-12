@@ -1,0 +1,437 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load l10n %}
+
+{% block title %}Bản đồ định vị &amp; Định tuyến thông minh DTHU{% endblock %}
+
+{% block content %}
+{% localize off %}
+<div class="bo-cuc-chinh d-flex flex-column vh-100 overflow-hidden bg-dark text-white">
+    <!-- Navbar Header -->
+    <header class="navbar navbar-dark bg-glass-dark border-bottom border-secondary px-4 py-2 flex-shrink-0 d-flex justify-content-between align-items-center">
+        <a href="{% url 'client:giao_dien_chinh' %}" class="navbar-brand d-flex align-items-center gap-2 m-0 text-white fw-bold">
+            <i class="fa-solid fa-map-location-dot text-primary fs-4 animate-pulse"></i>
+            <span>BẢN ĐỒ CAMPUS DTHU</span>
+        </a>
+        <div class="d-flex align-items-center gap-3">
+            {% if uat_report %}
+            <span class="badge bg-primary d-none d-md-inline-block p-2" title="Chất lượng hệ thống" style="cursor: help;">
+                <i class="fa-solid fa-circle-check me-1"></i> UAT: {{ uat_report.completion_rate }}% tác vụ | Sai số &lt;{{ uat_report.avg_gps_error }}m
+            </span>
+            {% endif %}
+            
+            {% if request.user.is_authenticated %}
+                <span class="small text-white-50"><i class="fa-solid fa-circle-user text-success me-1"></i>{{ request.user.username }}</span>
+                {% if request.user.is_staff_member %}
+                    <a href="{% url 'dashboard:overview' %}" class="btn btn-sm btn-outline-primary rounded-pill px-3"><i class="fa-solid fa-gauge me-1"></i>Quản trị</a>
+                {% endif %}
+                <a href="{% url 'client:logout' %}" class="btn btn-sm btn-outline-danger rounded-pill px-3"><i class="fa-solid fa-right-from-bracket me-1"></i>Đăng xuất</a>
+            {% else %}
+                <a href="{% url 'client:login' %}" class="btn btn-sm btn-primary rounded-pill px-3"><i class="fa-solid fa-right-to-bracket me-1"></i>Đăng nhập</a>
+                <a href="{% url 'client:register' %}" class="btn btn-sm btn-outline-light rounded-pill px-3">Đăng ký</a>
+            {% endif %}
+        </div>
+    </header>
+
+    <!-- Map & Sidebar Workspace -->
+    <div class="d-flex flex-grow-1 position-relative overflow-hidden">
+        <!-- Sidebar Navigation Drawer -->
+        <aside class="sidebar-panel bg-glass-dark border-end border-secondary flex-shrink-0 overflow-y-auto">
+            <!-- Tabs Menu Header -->
+            <ul class="nav nav-tabs nav-fill border-bottom border-secondary mb-3 sticky-top bg-glass-dark" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active py-3 text-white border-0" id="route-tab" data-bs-toggle="tab" data-bs-target="#route-pane" type="button" role="tab"><i class="fa-solid fa-route me-1 text-primary"></i>Tìm đường</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link py-3 text-white border-0" id="explore-tab" data-bs-toggle="tab" data-bs-target="#explore-pane" type="button" role="tab"><i class="fa-solid fa-magnifying-glass me-1 text-primary"></i>Địa điểm</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link py-3 text-white border-0" id="feedback-tab" data-bs-toggle="tab" data-bs-target="#feedback-pane" type="button" role="tab"><i class="fa-solid fa-comments me-1 text-primary"></i>Góp ý</button>
+                </li>
+            </ul>
+
+            <!-- Tabs Content -->
+            <div class="tab-content px-4 pb-4">
+                <!-- 1. PATHFINDING TAB -->
+                <div class="tab-pane fade show active" id="route-pane" role="tabpanel">
+                    <div class="card bg-dark-card border-secondary mb-4 rounded-3 shadow">
+                        <div class="card-body p-3">
+                            <h6 class="card-title fw-bold mb-3 d-flex align-items-center gap-2"><i class="fa-solid fa-route text-primary"></i>Định tuyến thông minh</h6>
+                            
+                            <div class="mb-3">
+                                <label class="form-label text-white-50 small">Điểm xuất phát:</label>
+                                <input type="text" id="start-input" class="form-control bg-dark border-secondary text-white" placeholder="Click bản đồ hoặc tìm kiếm..." readonly>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label text-white-50 small">Điểm đến:</label>
+                                <input type="text" id="end-input" class="form-control bg-dark border-secondary text-white" placeholder="Click bản đồ hoặc chọn địa điểm..." readonly>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label text-white-50 small">Lựa chọn thuật toán:</label>
+                                <select id="algorithm-select" class="form-select bg-dark border-secondary text-white">
+                                    <option value="both">(Khuyên dùng) So sánh cả hai</option>
+                                    <option value="dijkstra">Thuật toán Dijkstra</option>
+                                    <option value="a_star">Thuật toán A* (A-Star)</option>
+                                </select>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button id="calculate-btn" class="btn btn-primary flex-grow-1 rounded-pill fw-semibold"><i class="fa-solid fa-compass me-1 animate-spin"></i>Tìm đường</button>
+                                <button id="reset-btn" class="btn btn-outline-secondary rounded-pill"><i class="fa-solid fa-arrow-rotate-left"></i></button>
+                            </div>
+
+                            <div class="form-check form-switch mt-3 mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="debug-graph-switch" style="cursor: pointer;">
+                                <label class="form-check-label text-white-50 small" for="debug-graph-switch" style="cursor: pointer;"><i class="fa-solid fa-bug me-1"></i>Chế độ Debug Graph</label>
+                            </div>
+
+                            <div class="form-check form-switch mt-2 mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="editor-mode-switch" style="cursor: pointer;">
+                                <label class="form-check-label text-white-50 small" for="editor-mode-switch" style="cursor: pointer;"><i class="fa-solid fa-pen-to-square me-1"></i>Chế độ Editor</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Route Metrics Panel -->
+                    <div id="route-result-panel" class="d-none">
+                        <div class="card bg-dark-card border-success mb-3 rounded-3 shadow border-2">
+                            <div class="card-body p-3">
+                                <h6 class="card-title fw-bold text-success mb-2"><i class="fa-solid fa-circle-check me-2"></i>Tuyến đường tối ưu</h6>
+                                <div class="d-flex justify-content-between border-bottom border-secondary py-2 small">
+                                    <span class="text-white-50">Khoảng cách:</span>
+                                    <span id="route-distance" class="fw-semibold text-white">--</span>
+                                </div>
+                                <div class="d-flex justify-content-between border-bottom border-secondary py-2 small">
+                                    <span class="text-white-50">Thời gian đi bộ:</span>
+                                    <span id="route-duration" class="fw-semibold text-white">--</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Textual Algorithm Explanation Panel -->
+                        <div class="card bg-dark-card border-secondary mb-3 rounded-3 shadow">
+                            <div class="card-body p-3">
+                                <h6 class="card-title fw-bold text-primary mb-3"><i class="fa-solid fa-chart-line me-2"></i>So sánh &amp; Phân tích Thuật toán</h6>
+                                
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-dark table-sm table-bordered text-center align-middle m-0 small">
+                                        <thead>
+                                            <tr class="table-active">
+                                                <th>Chỉ số</th>
+                                                <th>Dijkstra</th>
+                                                <th>A* (A-Star)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="metrics-table-body">
+                                            <!-- Injected dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div class="alert alert-info py-2 px-3 small border-0 bg-glass-dark text-info mb-3">
+                                    <i class="fa-solid fa-lightbulb me-1"></i> 
+                                    <span id="algo-explanation-text">A* duyệt ít nút hơn nhờ heuristic (khoảng cách chim bay Haversine).</span>
+                                </div>
+
+                                <div class="mb-3">
+                                    <span class="small text-white-50 fw-semibold d-block mb-1">Độ phức tạp tính toán:</span>
+                                    <div class="p-2 bg-dark rounded small border border-secondary font-monospace" style="font-size: 11px;">
+                                        Dijkstra: O((V + E) log V)<br>
+                                        A* (A-Star): O(E log V) (với h(n) hợp lệ)
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <span class="small text-white-50 fw-semibold d-block mb-1">Sơ đồ đường đi (Nút):</span>
+                                    <div id="path-diagram" class="p-2 bg-dark rounded small border border-secondary text-info font-monospace text-wrap" style="font-size: 11px; max-height: 120px; overflow-y: auto;">
+                                        [Cổng B] ➔ [Nhà B1]
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Editor Panel -->
+                    <div id="editor-panel" class="d-none">
+                        <div class="card bg-dark-card border-warning mb-3 rounded-3 shadow border-2">
+                            <div class="card-body p-3">
+                                <h6 class="card-title fw-bold text-warning mb-3"><i class="fa-solid fa-pen-to-square me-2"></i>Editor Graph</h6>
+                                <div class="d-grid gap-2">
+                                    <button id="editor-tool-add_node" class="btn btn-sm btn-outline-success editor-tool-btn" onclick="setEditorTool('add_node')">
+                                        <i class="fa-solid fa-plus me-1"></i>Thêm Node
+                                    </button>
+                                    <button id="editor-tool-delete_node" class="btn btn-sm btn-outline-danger editor-tool-btn" onclick="setEditorTool('delete_node')">
+                                        <i class="fa-solid fa-trash me-1"></i>Xóa Node
+                                    </button>
+                                    <button id="editor-tool-move_node" class="btn btn-sm btn-outline-info editor-tool-btn" onclick="setEditorTool('move_node')">
+                                        <i class="fa-solid fa-arrows-up-down-left-right me-1"></i>Di chuyển Node
+                                    </button>
+                                    <button id="editor-tool-add_edge" class="btn btn-sm btn-outline-primary editor-tool-btn" onclick="setEditorTool('add_edge')">
+                                        <i class="fa-solid fa-link me-1"></i>Thêm Cạnh
+                                    </button>
+                                    <button id="editor-tool-delete_edge" class="btn btn-sm btn-outline-warning editor-tool-btn" onclick="setEditorTool('delete_edge')">
+                                        <i class="fa-solid fa-scissors me-1"></i>Xóa Cạnh
+                                    </button>
+                                </div>
+                                <div class="alert alert-info py-2 px-3 small border-0 bg-glass-dark text-info mb-0 mt-3">
+                                    <i class="fa-solid fa-circle-info me-1"></i>
+                                    Graph chỉ gồm <b>RouteNode</b> + <b>RouteEdge</b>. Dijkstra chạy trên graph này.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. EXPLORE PLACES TAB -->
+                <div class="tab-pane fade" id="explore-pane" role="tabpanel">
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <input type="text" id="search-address-input" class="form-control bg-dark border-secondary text-white" placeholder="Tìm địa chỉ ngoài trường (Nominatim)...">
+                            <button id="search-address-btn" class="btn btn-outline-primary" type="button"><i class="fa-solid fa-magnifying-glass"></i></button>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold mb-3 mt-4 text-white"><i class="fa-solid fa-location-dot text-primary me-2"></i>Tìm kiếm trong Campus</h6>
+                    <div class="accordion accordion-flush" id="places-accordion">
+                        {% for cat in categories %}
+                        <div class="accordion-item bg-transparent text-white border-bottom border-secondary">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-transparent text-white border-0 py-3" type="button" data-bs-toggle="collapse" data-bs-target="#flush-cat-{{ cat.id }}">
+                                    <i class="fa-solid {{ cat.icon }} text-primary me-2"></i> {{ cat.name }}
+                                </button>
+                            </h2>
+                            <div id="flush-cat-{{ cat.id }}" class="accordion-collapse collapse" data-bs-parent="#places-accordion">
+                                <div class="accordion-body bg-dark-card p-2">
+                                    <div class="list-group list-group-flush rounded-3">
+                                        {% for loc in locations %}
+                                            {% if loc.category.id == cat.id %}
+                                            <button type="button" class="list-group-item list-group-item-action bg-transparent text-white border-0 py-2 small d-flex justify-content-between align-items-center list-item-poi" 
+                                                    data-lat="{{ loc.latitude }}" data-lng="{{ loc.longitude }}" data-id="{{ loc.id }}" data-name="{{ loc.name }}" data-desc="{{ loc.description }}" data-address="{{ loc.address|escapejs }}">
+                                                <span>{{ loc.name }}</span>
+                                                <i class="fa-solid fa-location-arrow text-primary small opacity-50"></i>
+                                            </button>
+                                            {% endif %}
+                                        {% empty %}
+                                            <div class="text-white-50 small p-2">Không có địa điểm nào.</div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 3. FEEDBACK TAB -->
+                <div class="tab-pane fade" id="feedback-pane" role="tabpanel">
+                    {% if request.user.is_authenticated %}
+                        <div class="card bg-dark-card border-secondary rounded-3 shadow">
+                            <div class="card-body p-3">
+                                <h6 class="card-title fw-bold mb-3 text-white"><i class="fa-solid fa-paper-plane me-2 text-primary"></i>Gửi phản hồi hệ thống</h6>
+                                
+                                <form id="feedback-form" method="POST">
+                                    {% csrf_token %}
+                                    <div class="mb-3">
+                                        <label class="form-label small text-white-50">Tiêu đề:</label>
+                                        <input type="text" id="feedback-subject" class="form-control bg-dark border-secondary text-white" placeholder="Góp ý tìm đường, GPS,..." required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small text-white-50">Nội dung:</label>
+                                        <textarea id="feedback-message" class="form-control bg-dark border-secondary text-white" rows="4" placeholder="Viết đánh giá của bạn tại đây..." required></textarea>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="form-label small text-white-50 d-block">Đánh giá hệ thống:</label>
+                                        <div class="rating-stars fs-4 d-flex gap-2 justify-content-center py-2 bg-dark rounded border border-secondary" style="cursor: pointer;">
+                                            <i class="fa-regular fa-star star-btn text-warning" data-val="1"></i>
+                                            <i class="fa-regular fa-star star-btn text-warning" data-val="2"></i>
+                                            <i class="fa-regular fa-star star-btn text-warning" data-val="3"></i>
+                                            <i class="fa-regular fa-star star-btn text-warning" data-val="4"></i>
+                                            <i class="fa-regular fa-star star-btn text-warning" data-val="5"></i>
+                                        </div>
+                                        <input type="hidden" id="feedback-rating" value="5">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100 rounded-pill fw-semibold"><i class="fa-solid fa-check me-1"></i>Gửi phản hồi</button>
+                                </form>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning text-center border-0 py-3 rounded-3">
+                            <i class="fa-solid fa-lock fa-2x mb-2 d-block"></i>
+                            <span class="small d-block mb-3">Vui lòng đăng nhập để gửi phản hồi và đánh giá hệ thống.</span>
+                            <a href="{% url 'client:login' %}" class="btn btn-sm btn-primary rounded-pill px-4">Đăng nhập ngay</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </aside>
+
+        <!-- Backdrop overlay for mobile sidebar -->
+        <div id="sidebar-backdrop"></div>
+
+        <!-- Leaflet Map Container -->
+        <main id="map-wrapper" class="flex-grow-1 h-100 position-relative">
+            <div id="map" class="w-100 h-100"></div>
+
+            <!-- GPS info overlay (bottom-left) -->
+            <div id="gps-status-panel" class="position-absolute bottom-0 start-0 m-3 p-3 bg-glass-dark border border-secondary rounded shadow d-none" style="z-index: 1000; width: 260px;">
+                <h6 class="fw-bold mb-2 text-primary small d-flex align-items-center gap-2"><i class="fa-solid fa-circle-dot text-success animate-pulse"></i>Trạng thái định vị GPS</h6>
+                <div class="small mb-1">Vĩ độ: <span id="gps-lat" class="font-monospace fw-semibold text-white">--</span></div>
+                <div class="small mb-1">Kinh độ: <span id="gps-lng" class="font-monospace fw-semibold text-white">--</span></div>
+                <div class="small">Sai số (Độ chính xác): <span id="gps-acc" class="fw-semibold text-warning">--</span></div>
+            </div>
+
+            <!-- Navigation HUD (bottom-center) — shown during active navigation -->
+            <div id="nav-hud" class="nav-hud d-none">
+                <div class="nav-hud-inner">
+                    <div class="nav-hud-dest">
+                        <i class="fa-solid fa-location-dot text-success me-1"></i>
+                        <span id="nav-dest-name" class="fw-semibold text-white">--</span>
+                    </div>
+                    <div class="nav-hud-stats">
+                        <div class="nav-stat">
+                            <span class="nav-stat-value" id="nav-remaining-dist">--</span>
+                            <span class="nav-stat-label">còn lại</span>
+                        </div>
+                        <div class="nav-stat-divider"></div>
+                        <div class="nav-stat">
+                            <span class="nav-stat-value" id="nav-remaining-time">--</span>
+                            <span class="nav-stat-label">đi bộ</span>
+                        </div>
+                    </div>
+                    <div class="nav-hud-actions">
+                        <button id="nav-recenter-btn" class="nav-hud-btn" title="Về vị trí của tôi">
+                            <i class="fa-solid fa-crosshairs"></i>
+                        </button>
+                        <button id="nav-recalculate-btn" class="nav-hud-btn nav-hud-btn-primary" title="Tính lại đường đi">
+                            <i class="fa-solid fa-rotate"></i> Tính lại
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Desktop Sidebar Toggle Button (GIS tab style) -->
+            <button id="sidebar-toggle-desktop" class="sidebar-toggle-desktop d-none d-md-flex" title="Thu gọn / Mở rộng bảng điều khiển">
+                <i class="fa-solid fa-chevron-left" id="toggle-desktop-icon"></i>
+            </button>
+
+            <!-- Floating GPS locate & track button (bottom-right of map) -->
+            <button id="my-location-btn" class="gps-float-btn" title="Định vị vị trí của tôi">
+                <i class="fa-solid fa-location-crosshairs" id="gps-btn-icon"></i>
+            </button>
+        </main>
+
+        <!-- Mobile FAB: open/close sidebar panel -->
+        <button id="sidebar-toggle-mobile" aria-label="Mở bảng điều hướng">
+            <i class="fa-solid fa-route" id="fab-icon"></i>
+            <span id="fab-label">Tìm đường</span>
+        </button>
+    </div>
+</div>
+
+{% endlocalize %}
+{% endblock %}
+
+
+{% block extra_js %}
+{% localize off %}
+<!-- Embedded JSON data from Django models -->
+<script id="locations-data" type="application/json">
+[
+    {% for loc in locations %}
+    {
+        "id": {{ loc.id }},
+        "name": "{{ loc.name|escapejs }}",
+        "category_slug": "{{ loc.category.slug }}",
+        "category_icon": "{{ loc.category.icon }}",
+        "lat": {{ loc.latitude }},
+        "lng": {{ loc.longitude }},
+        "desc": "{{ loc.description|escapejs }}",
+        "address": "{{ loc.address|escapejs }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+]
+</script>
+
+<script id="nodes-data" type="application/json">
+{{ nodes_json|safe }}
+</script>
+
+<script id="edges-data" type="application/json">
+{{ edges_json|safe }}
+</script>
+
+<script id="building-polygons-data" type="application/json">
+{{ building_polygons_json|safe }}
+</script>
+{% endlocalize %}
+<script src="{% static 'app/js/map_client.js' %}"></script>
+<script>
+(function () {
+    // Mobile bottom-sheet sidebar toggle
+    var sidebar  = document.querySelector('.sidebar-panel');
+    var backdrop = document.getElementById('sidebar-backdrop');
+    var fab      = document.getElementById('sidebar-toggle-mobile');
+    var fabIcon  = document.getElementById('fab-icon');
+    var fabLabel = document.getElementById('fab-label');
+
+    // Desktop collapse toggle
+    var btnDesktop   = document.getElementById('sidebar-toggle-desktop');
+    var iconDesktop  = document.getElementById('toggle-desktop-icon');
+
+    if (sidebar && btnDesktop && iconDesktop) {
+        btnDesktop.addEventListener('click', function () {
+            sidebar.classList.toggle('collapsed');
+            
+            // Toggle icon directions
+            if (sidebar.classList.contains('collapsed')) {
+                iconDesktop.className = 'fa-solid fa-chevron-right';
+            } else {
+                iconDesktop.className = 'fa-solid fa-chevron-left';
+            }
+
+            // Invalidate Leaflet map size once transition ends
+            setTimeout(function () {
+                if (typeof map !== 'undefined' && map) {
+                    map.invalidateSize({ animate: true });
+                }
+            }, 400);
+        });
+    }
+
+    if (!sidebar || !fab) return;
+
+    function openSidebar() {
+        sidebar.classList.add('mobile-open');
+        backdrop.classList.add('active');
+        fab.classList.add('panel-open');
+        fabIcon.className = 'fa-solid fa-xmark';
+        fabLabel.textContent = 'Đóng';
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('mobile-open');
+        backdrop.classList.remove('active');
+        fab.classList.remove('panel-open');
+        fabIcon.className = 'fa-solid fa-route';
+        fabLabel.textContent = 'Tìm đường';
+        document.body.style.overflow = '';
+    }
+
+    fab.addEventListener('click', function () {
+        if (sidebar.classList.contains('mobile-open')) { closeSidebar(); } else { openSidebar(); }
+    });
+
+    backdrop.addEventListener('click', closeSidebar);
+
+    // Touch swipe-down to dismiss
+    var startY = 0;
+    sidebar.addEventListener('touchstart', function(e) { startY = e.touches[0].clientY; }, { passive: true });
+    sidebar.addEventListener('touchend', function(e) {
+        if (e.changedTouches[0].clientY - startY > 60) { closeSidebar(); }
+    }, { passive: true });
+})();
+</script>
+{% endblock %}

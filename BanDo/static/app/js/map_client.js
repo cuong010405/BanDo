@@ -246,6 +246,11 @@ function setRoutingPoint(type, lat, lng, name) {
         });
     }
     map.closePopup();
+
+    // Auto-calculate route when both points are set and we are not in active navigation
+    if (startCoords && endCoords && !navIsActive) {
+        calculateSmartRoute();
+    }
 }
 
 function handleMapClick(e) {
@@ -996,6 +1001,7 @@ async function searchNominatimAddress() {
 // ====================================================
 function populateAlgorithmComparison(data) {
     const tb = document.getElementById('metrics-table-body');
+    if (!tb) return;
     tb.innerHTML = '';
     const d = data.dijkstra, a = data.a_star;
     tb.innerHTML += `<tr><td class="text-start text-white-50">Số nút đã duyệt</td><td class="font-monospace fw-semibold text-danger">${d ? d.visited_nodes + ' nút' : '--'}</td><td class="font-monospace fw-semibold text-success">${a ? a.visited_nodes + ' nút' : '--'}</td></tr>`;
@@ -1085,13 +1091,13 @@ function toggleEditorMode() {
     const switchEl = document.getElementById('editor-mode-switch');
 
     if (editorMode) {
-        panel.classList.remove('d-none');
+        if (panel) panel.classList.remove('d-none');
         editorLayers = L.layerGroup().addTo(map);
         loadEditorGraph();
         map.getContainer().style.cursor = 'crosshair';
         showToastNotification('🔧 Chế độ Editor đã bật. Chọn công cụ để chỉnh sửa đồ thị.');
     } else {
-        panel.classList.add('d-none');
+        if (panel) panel.classList.add('d-none');
         if (editorLayers) { map.removeLayer(editorLayers); editorLayers = null; }
         editorNodeMarkers = {};
         editorEdgeLines = {};

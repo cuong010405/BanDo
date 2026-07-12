@@ -101,6 +101,80 @@ def giao_dien_chinh(request):
         'building_polygons_json': json.dumps(BUILDING_POLYGONS),
         'notifications': user_notifications,
         'uat_report': uat_report,
+        'is_admin_mode': False,
+    }
+    return render(request, 'client/main.html', context)
+
+
+def admin_map(request):
+    """Admin client map interface with graph debug and editor tools."""
+    if not is_staff_check(request.user):
+        messages.error(request, "Bạn không có quyền truy cập trang bản đồ quản trị.")
+        return redirect('client:login')
+
+    import json
+    from routes.pathfinder import is_edge_valid, point_in_polygon, BUILDING_POLYGONS
+
+    categories = Category.objects.all()
+    locations = Location.objects.filter(is_active=True).select_related('category')
+    nodes = RouteNode.objects.all()
+    edges = RouteEdge.objects.filter(is_active=True).select_related('node_a', 'node_b')
+
+    nodes_list = []
+    for n in nodes:
+        lat_f = float(n.latitude)
+        lng_f = float(n.longitude)
+        inside_building = False
+        for poly in BUILDING_POLYGONS:
+            if point_in_polygon(lat_f, lng_f, poly):
+                inside_building = True
+                break
+        
+        nodes_list.append({
+            'id': n.id,
+            'lat': lat_f,
+            'lng': lng_f,
+            'name': n.name or "",
+            'is_on_walkway': not inside_building
+        })
+
+    edges_list = []
+    for edge in edges:
+        lat_a = float(edge.node_a.latitude)
+        lng_a = float(edge.node_a.longitude)
+        lat_b = float(edge.node_b.latitude)
+        lng_b = float(edge.node_b.longitude)
+        valid = is_edge_valid(lat_a, lng_a, lat_b, lng_b)
+        
+        edges_list.append({
+            'id': edge.id,
+            'node_a': edge.node_a.id,
+            'node_b': edge.node_b.id,
+            'distance': edge.distance,
+            'is_valid': valid,
+            'is_new': edge.id > 282
+        })
+    
+    # Fetch active notifications for authenticated user
+    user_notifications = []
+    if request.user.is_authenticated:
+        from django.db.models import Q
+        user_notifications = Notification.objects.filter(
+            Q(user=request.user) | Q(user__isnull=True)
+        )[:5]
+
+    # Fetch last UAT metrics to display
+    uat_report = Report.objects.first()
+
+    context = {
+        'categories': categories,
+        'locations': locations,
+        'nodes_json': json.dumps(nodes_list),
+        'edges_json': json.dumps(edges_list),
+        'building_polygons_json': json.dumps(BUILDING_POLYGONS),
+        'notifications': user_notifications,
+        'uat_report': uat_report,
+        'is_admin_mode': True,
     }
     return render(request, 'client/main.html', context)
 
